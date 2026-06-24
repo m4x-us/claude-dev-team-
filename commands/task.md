@@ -337,6 +337,29 @@ Run: `bash scripts/check-patterns-threshold.sh .autocode/patterns.md`
   Do NOT auto-run /patterns. Signal to Max, let Max decide.
 - Script not found: skip silently.
 
+**Step 4.3 — Batch completion survey:**
+
+Read `.autocode/tasks.md`. Find which `## Batch N` section contains `Task #[TASK_NUM]`.
+
+Count all `### Task #` entries in that batch section.
+Count how many have `**Status: COMPLETE` in their block.
+
+If ALL tasks in the batch are COMPLETE:
+  Run: `/team-health scan batch-[BATCH_NUM]-complete`
+
+  The survey updates `.autocode/map.md` with the current state of all three layers (pieces, modules, app). If the survey output includes PROPOSED ADDITIONS: review them and add any with severity ≥ 5 to the next BACKLOG batch in `.autocode/tasks.md`. Note each added task: "Added by layer survey — Batch [N] complete — [today's date]".
+
+  Print:
+  ```
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    BATCH [N] COMPLETE — Layer survey run.
+    Map updated: .autocode/map.md
+    Next: /task #[next open task number]
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ```
+
+If not all tasks in the batch are COMPLETE: skip silently — survey fires only at full batch boundaries.
+
 ---
 
 ## ESCALATION

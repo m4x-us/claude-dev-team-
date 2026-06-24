@@ -1,6 +1,134 @@
 # Team Health — CTO Dashboard
 
-You are generating the CTO dashboard. No scans. No agents. Pure reporting from existing `.autocode/` files.
+You are generating the CTO dashboard. When invoked with `scan` (or triggered automatically by /task at batch completion), runs the three-layer survey first to update `.autocode/map.md`, then shows the dashboard.
+
+---
+
+## SCAN MODE
+
+**Trigger:** Run if $ARGUMENTS contains "scan". Otherwise skip to STEP 1.
+
+Read `.autocode/map.md` → `PRIOR_MAP` (full contents, or "None — first scan").
+
+---
+
+### Layer 1 — Piece Coverage
+
+Identify modules: every directory that is either (a) a package root (contains `package.json` and a `src/` subdirectory) or (b) a major feature directory under `apps/web/src/app/dashboard/` that contains ≥ 3 source files directly or one level deep.
+
+For each module, run:
+
+```bash
+# Source files (exclude tests, types, build artifacts)
+find [module_dir] \( -name '*.ts' -o -name '*.tsx' \) \
+  ! -name '*.test.*' ! -name '*.spec.*' ! -name '*.d.ts' \
+  ! -path '*/node_modules/*' ! -path '*/.next/*' ! -path '*/dist/*'
+
+# Test files
+find [module_dir] \( -name '*.test.ts' -o -name '*.test.tsx' \) \
+  ! -path '*/node_modules/*'
+```
+
+A source file is **covered** if a `.test.ts` or `.test.tsx` with the same stem exists in the same directory.
+Module piece coverage = covered files / total source files.
+
+---
+
+### Layer 2 — Module Integration Coverage
+
+For each module:
+
+```bash
+find [module_dir] -name '*.integration.test.*' ! -path '*/node_modules/*' | head -1
+```
+
+✓ if any result. ✗ if empty.
+
+---
+
+### Layer 3 — App E2E Coverage
+
+```bash
+find . \( -path '*/playwright/*' -o -path '*/e2e/*' \) \
+  \( -name '*.spec.ts' -o -name '*.spec.tsx' \) \
+  ! -path '*/node_modules/*'
+```
+
+List all found spec files as covered flows.
+
+---
+
+### Write `.autocode/map.md`
+
+```
+# Layer Map — [project name]
+Last survey: [today's date] | Triggered by: [value of $ARGUMENTS]
+
+## Piece Layer
+| Module | Covered | Total | % | Uncovered (first 5) |
+|--------|---------|-------|---|---------------------|
+| [name] | N       | M     | N%| file1.ts, file2.ts  |
+
+## Module Layer
+| Module | Integration Test | Status |
+|--------|-----------------|--------|
+| [name] | [filename or —] | ✓ / ✗  |
+
+## App Layer (E2E)
+| Spec File | Status |
+|-----------|--------|
+| [path]    | ✓      |
+
+## Delta Since Last Survey
+[compare against PRIOR_MAP — list new gaps, closed gaps, or "First survey — no prior data"]
+```
+
+---
+
+### Gap Analysis — Propose tasks only when threshold exceeded
+
+- Piece coverage < 40% AND module has ≥ 5 source files → severity 5 gap
+- No integration test AND module has ≥ 8 source files → severity 4 gap
+- No E2E spec found at all → severity 6 gap
+- No E2E spec AND module name contains auth / order / payment → severity 7 gap
+
+For each gap above threshold, format a proposed task entry:
+
+```
+Proposed: Add [piece tests / integration test / E2E spec] for [module]
+What: [specific files or flows to cover]
+Why: [gap description — coverage %, file count]
+Severity: [N]
+Owner: QA Agent
+Done when: [test file exists and all assertions pass]
+```
+
+CTO decides whether to add proposed tasks to the next available batch in `.autocode/tasks.md`. If adding: append them to the lowest-numbered BACKLOG batch and note "Added by layer survey — [today's date]".
+
+---
+
+### Print Survey Summary
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  LAYER SURVEY — [today's date]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PIECE LAYER ([N] modules scanned)
+  [module]: [N]/[M] ([%]) ✓
+  [module]: [N]/[M] ([%]) ✗ gap
+MODULE LAYER
+  [module]: ✓ integration test
+  [module]: ✗ no integration test — [N] source files
+APP LAYER
+  [N] E2E specs: [filenames or "none found"]
+NEW SINCE LAST SURVEY
+  [delta list or "No change"]
+PROPOSED ADDITIONS
+  [task proposals for gaps above threshold, or "None — all layers healthy"]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+After printing the survey summary: continue to STEP 1 (dashboard).
 
 ---
 
