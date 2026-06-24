@@ -360,6 +360,46 @@ If ALL tasks in the batch are COMPLETE:
 
 If not all tasks in the batch are COMPLETE: skip silently — survey fires only at full batch boundaries.
 
+**Step 4.4 — Priority reorder (CTO discretion):**
+
+Runs immediately after Step 4.3 — whether or not a batch just completed. After every task cycle, the CTO reassesses the remaining work.
+
+Read all non-COMPLETE tasks from `.autocode/tasks.md` (across all batches). Read the current survey output (from Step 4.3 if it ran, or `.autocode/map.md` if it exists), agent memories, and AUDIT_TRENDS.
+
+**Priority reasoning — apply in this order:**
+
+1. **Dependency lock:** A task cannot move before any task it is "Blocked by." This is a hard constraint — never violated.
+
+2. **Elevation triggers** (move task to an earlier batch):
+   - Task addresses a gap just found by the layer survey (piece, module, or E2E gap flagged this cycle)
+   - Task is security or auth category AND a security finding appeared in the most recent audit
+   - Task has severity ≥ 8 AND is not in the current sprint batch
+   - A pattern in `.autocode/patterns.md` directly implicates this task's file or module
+
+3. **Demotion triggers** (move task to a later batch):
+   - Task has severity ≤ 3 AND nothing blocks it AND nothing depends on it
+   - Task addresses a module the survey just confirmed is healthy (good coverage, integration test exists)
+   - Task is a documentation or polish task when critical security or QA gaps are open
+
+4. **Default:** If no trigger applies, leave the task where it is. Do not reorder for its own sake.
+
+**How to reorder:**
+- Move tasks by changing which `## Batch N` section they appear in within tasks.md.
+- Task numbers are NEVER changed — #007 stays #007 regardless of which batch it's in.
+- Batch headers (theme, dependency statement) must be updated if the composition changes significantly.
+- If a task moves, add a one-line note below its `**Owner:**` line: `**Moved:** Batch [from] → Batch [to] — [one sentence reason] — [today's date]`
+
+**Print only if anything moved:**
+```
+─────────────────────────────────────────────────────────────
+  PRIORITY REORDER — [N] task(s) moved
+  Task #NNN: Batch X → Batch Y — [reason]
+  Task #NNN: Batch X → Batch Y — [reason]
+─────────────────────────────────────────────────────────────
+```
+
+If nothing moved: print nothing. The reorder is silent when the list is already in the right order.
+
 ---
 
 ## ESCALATION
