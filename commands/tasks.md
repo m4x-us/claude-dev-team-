@@ -38,29 +38,43 @@ No task list found. Run /meet to generate one.
 
 Parse each `## Batch N` section and every `### Task #` entry within it. For each task extract: number, title (first line of description), Complexity field, Owner, Status.
 
-Print a formatted table, grouped by batch:
+Print a Unicode box-drawing table, one table per batch. Use these exact border characters: `─ │ ┌ ┐ └ ┘ ├ ┤ ┬ ┴ ┼`. Pad every cell with spaces so columns are consistent width across all rows.
+
+Column widths (minimum — expand to fit longest value if needed):
+- `#`: 6 chars
+- `Complexity`: 13 chars
+- `Title`: 48 chars (truncate to 45 + `...` if longer)
+- `Owner`: 18 chars
+- `Status`: 12 chars
+
+Format:
 
 ```
-## Batch N — [theme]
+Batch N — [theme]
+┌────────┬───────────────┬──────────────────────────────────────────────────┬────────────────────┬──────────────┐
+│ #      │ Complexity    │ Title                                            │ Owner              │ Status       │
+├────────┼───────────────┼──────────────────────────────────────────────────┼────────────────────┼──────────────┤
+│ #001   │ ⚡ Direct     │ Fix typo in lockout error message                │ QA Agent           │ open         │
+│ #002   │ 🔧 Full       │ Add rate limiting to login route                 │ Security Agent     │ ✓ Complete   │
+│ #003   │ ❓ No label   │ Refactor session middleware                      │ Architecture Agent │ open         │
+└────────┴───────────────┴──────────────────────────────────────────────────┴────────────────────┴──────────────┘
 
-| # | Complexity | Title | Owner | Status |
-|---|-----------|-------|-------|--------|
-| #001 | ⚡ Direct | [title] | [owner] | ✓ Complete |
-| #002 | 🔧 Full   | [title] | [owner] | open |
-| #003 | ❓ No label | [title] | [owner] | open |
+Batch N+1 — [theme]
+┌────────┬───────────────┬──────────────────────────────────────────────────┬────────────────────┬──────────────┐
+│ #      │ Complexity    │ Title                                            │ Owner              │ Status       │
+├────────┼───────────────┼──────────────────────────────────────────────────┼────────────────────┼──────────────┤
+│ #004   │ 🔧 Full       │ ...                                              │ ...                │ open         │
+└────────┴───────────────┴──────────────────────────────────────────────────┴────────────────────┴──────────────┘
 
-## Batch N+1 — [theme]
-
-| # | Complexity | Title | Owner | Status |
-|---|-----------|-------|-------|--------|
-...
-
----
 [total open] open · [total complete] complete · [total] total
 [N] tasks missing Complexity label — run /task #N to classify
 ```
 
-Icons: `⚡ Direct` = no full dev team needed. `🔧 Full` = full team. `❓ No label` = unclassified, will be evaluated at Step 0.0 when run.
+Rules:
+- Every table must have the same column widths — do not let columns vary between batches
+- Every row padded to the same width — no ragged right edges
+- Batch label appears on the line immediately above each table, not inside it
+- Icons: `⚡ Direct` = no full dev team needed · `🔧 Full` = full team · `❓ No label` = unclassified
 
 ---
 
