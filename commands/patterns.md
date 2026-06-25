@@ -544,6 +544,61 @@ Present each candidate one at a time. If none qualify: already printed above.
 
 ---
 
+**Step 4E — Carry-Forward Pattern Analysis:**
+
+Read `.autocode/carry-forward-log.md`. If it doesn't exist or contains no data rows (only the header): print `CF-PATTERNS: No carry-forward history yet.` and skip this step.
+
+Parse each data row: `| date | source_task | cf_task | category | description | severity |`
+
+Group by `category`. For any category with entries from 2 or more DIFFERENT source tasks (different values in the Source Task column): it is a systematic build gap.
+
+For each systematic gap category:
+
+1. Extract the relevant principle text from the WORLDCLASS_MANDATE block in `~/.claude/commands/task.md`. Find the principle whose name or focus matches the category (e.g., `tests` → "Tests prove behavior"; `async` → "Close every async path"; `code-quality` → "Earn every abstraction" or "Name the contract exactly").
+
+2. Spawn an agent:
+   "The build agent has produced carry-forward WorldClass gaps in category [CATEGORY] across [N] different tasks:
+   [list each entry: Source Task | description | severity]
+
+   The current WORLDCLASS_MANDATE principle for this category:
+   [principle text from task.md WORLDCLASS_MANDATE]
+
+   This is the exact text the build agent reads before writing any code. The carry-forward history shows it is not preventing this class of gap.
+
+   Propose a concrete strengthening (maximum 3 sentences appended to the existing principle) that would help the build agent avoid this exact class of gap. Requirements:
+   - Draw a specific negative example from the carry-forward history above
+   - Name what the build agent is checking instead of what it should check
+   - End with a test the builder can apply before writing the function
+
+   Output exactly: PROPOSED_ADDITION: [text to append]"
+
+3. Present proposal:
+   ```
+   ──────────────────────────────────────────────────────
+     WORLDCLASS_MANDATE UPDATE — [CATEGORY]
+     [N] carry-forwards across [N] tasks
+   ──────────────────────────────────────────────────────
+     [PROPOSED_ADDITION]
+   ──────────────────────────────────────────────────────
+     approve / skip
+   ```
+   If approved: edit `~/.claude/commands/task.md` — find the relevant WORLDCLASS_MANDATE principle and append PROPOSED_ADDITION. Copy updated task.md to `/tmp/claude-dev-team/commands/task.md` and stage for commit (commit at end of Step 4E after all approvals processed).
+
+4. Map category to agent memory file:
+   - `code-quality`, `tests`, `edge-case` → `qa.md`
+   - `security`, `auth` → `security.md`
+   - `async`, `data-loss`, `error-handling` → `architect.md`
+
+   Append to `## Known Blind Spots` in `.autocode/agents/[file]`:
+   `- Carry-forward pattern: [category] gap across [N] tasks — [one-line description] — [today's date]`
+
+After processing all systematic gaps, print:
+`CF-PATTERNS: [N] systematic gap(s) detected. [N] WORLDCLASS_MANDATE update(s) proposed. [N] agent blind spot(s) recorded.`
+
+If any WORLDCLASS_MANDATE updates were approved: commit and push the updated task.md to dev-team repo.
+
+---
+
 ## RULES
 
 - Never fabricate data — only use what is in the log files

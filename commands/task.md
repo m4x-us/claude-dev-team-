@@ -413,6 +413,56 @@ Wait for user input.
 If **no**: stop. Task remains In Progress.
 
 If **yes**:
+
+  **Step 4.1a — Carry-Forward Gate:**
+
+  Read the `**WorldClass deductions —**` block from the current task entry in `.autocode/tasks.md`. Extract all deduction lines with severity ≥ 4. If no such block exists, or no lines with severity ≥ 4 are found: skip this step entirely and proceed to /reflect.
+
+  If 4 or more severity ≥ 4 deductions exist, print first:
+  `⚠️ [N] carry-forwards from a single task — consider whether task scope was too broad.`
+
+  Present to Max:
+  ```
+  ──────────────────────────────────────────────────────
+    CARRY-FORWARD GATE — [N] gaps from Task #[TASK_NUM]
+  ──────────────────────────────────────────────────────
+    WorldClass score: [COMBINED_SCORE]/100
+
+    [1] CARRY-FORWARD | severity [N] | [category]: [description] (-[N] pts)
+    [2] CARRY-FORWARD | severity [N] | [category]: [description] (-[N] pts)
+    ...
+
+    All severity ≥ 4 items default to CARRY-FORWARD (added to end of Batch [N]).
+    Override any item before continuing:
+      debt [N] [reason]  → ACCEPTED-DEBT (logged to debt.md, requires reason)
+      ok                 → accept all defaults and continue
+  ──────────────────────────────────────────────────────
+  ```
+
+  Wait for input. Process overrides.
+
+  For each CARRY-FORWARD item:
+  - Determine NEXT_NUM: find the highest `### Task #` number in `.autocode/tasks.md` and increment by 1 per new task
+  - Find the last `### Task #` entry in the current `## Batch [N]` section (the batch containing Task #[TASK_NUM])
+  - Insert a new task block immediately after it (before any `## Batch [N+1]` header):
+    ```
+    ### Task #[NEXT_NUM]
+    **Carry-Forward from Task #[TASK_NUM] — [original task title, first line only]**
+    Resolve the [category] WorldClass gap: [exact deduction description]. Target: eliminate the -[N]pt deduction.
+    **Complexity: Direct**
+    **Owner:** [same owner as Task #[TASK_NUM]]
+    **File:** [same file(s) as Task #[TASK_NUM]]
+    **Added:** Carry-forward — [today's date] — WorldClass score was [COMBINED_SCORE]/100
+    ```
+  - Append to `.autocode/carry-forward-log.md` (create with header `# Carry-Forward Log\n| Date | Source Task | CF Task | Category | Description | Severity |\n|------|------------|---------|----------|-------------|---------|` if not exists):
+    `| [today's date] | Task #[TASK_NUM] | Task #[NEXT_NUM] | [category] | [description] | [severity] |`
+
+  For each ACCEPTED-DEBT item:
+  - Append to `.autocode/debt.md` (create with header `# Accepted Technical Debt\n| Date | Source Task | Category | Description | Severity | Reason |\n|------|------------|---------|-------------|---------|---------|` if not exists):
+    `| [today's date] | Task #[TASK_NUM] | [category] | [description] | [severity] | [reason provided] |`
+
+  Print: `✓ Carry-forward: [N] task(s) added to end of Batch [N] (#[NUM1], #[NUM2], ...) | Accepted debt: [N] item(s) logged`
+
   Run: `/reflect Task #[TASK_NUM]: [TASK_DEFINITION first line]`
   Edit `.autocode/tasks.md`: add `**Status: COMPLETE — [today's date]**` below Task #TASK_NUM Owner line.
   If a `**Audit findings —` or `**WorldClass deductions —` block exists in this task: remove it — findings are resolved.
