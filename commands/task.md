@@ -25,7 +25,15 @@ If found:
 ─────────────────────────────────────────────────────────────
 Wait for user input. If no: stop. If yes: proceed to Step 0.1.
 
-If no Complexity field or Complexity: Full: proceed to Step 0.1 silently.
+If Complexity: Full: proceed to Step 0.1 silently.
+
+If no Complexity field:
+  Run COMPLEXITY_EVAL on the task description:
+  DIRECT if ALL: (a) ≤ 20 words, (b) contains a cosmetic keyword (typo/comment/rename/update text/fix label/add log/remove unused/clarify/whitespace/formatting), (c) contains none of: auth/security/database/migration/schema/api route/endpoint/feature flag/implement/integrate/webhook/redis/queue/worker/payment/order/multi-file.
+  FULL otherwise (default when in doubt).
+  Write `**Complexity: [Direct/Full]**` to the task entry in `.autocode/tasks.md` before the `**Owner:**` line.
+  If Direct: show the warning above and wait for yes/no input.
+  If Full: proceed to Step 0.1 silently.
 
 **Step 0.1 — Read task definition:**
 Read `.autocode/tasks.md`. Find Task #TASK_NUM.
@@ -517,9 +525,39 @@ If ALL tasks in the batch are COMPLETE:
 
 If not all tasks in the batch are COMPLETE: skip silently — survey fires only at full batch boundaries.
 
-**Step 4.4 — Priority reorder (CTO discretion):**
+**Step 4.4 — Post-completion triage:**
 
-Runs immediately after Step 4.3 — whether or not a batch just completed. After every task cycle, the CTO reassesses the remaining work.
+Runs immediately after Step 4.3 — whether or not a batch just completed. Three passes over all non-COMPLETE tasks. The just-completed task's TASK_DEFINITION is the reference for Passes 1 and 2.
+
+**Pass 1 — Label audit (mechanical):**
+
+Scan every non-COMPLETE task in `.autocode/tasks.md`. For each:
+- If no `**Complexity:**` field: run COMPLEXITY_EVAL (same rule as Step 4.3). Write `**Complexity: Direct**` or `**Complexity: Full**` before the `**Owner:**` line.
+- If `**Complexity: Full**` but the description is now ≤ 20 words: re-run COMPLEXITY_EVAL. If it qualifies as Direct, update the label and add a note below `**Owner:**`: `**Label updated:** Full → Direct — [today's date] — [one-line reason]`
+
+Do not upgrade Direct → Full based on description length alone — only downgrade.
+
+**Pass 2 — Obsolescence and scope sweep (judgment):**
+
+For each non-COMPLETE task, compare its description against what Task #[TASK_NUM] actually shipped:
+
+- **Fully redundant** — the completed task shipped the same fix at the same location (same file, same function, same defect class): mark COMPLETE with `**Status: COMPLETE — [today's date] — Resolved by Task #[TASK_NUM]: [one sentence why]**`
+- **Scope reduced** — the completed task addressed part of this open task (e.g., refactored the module this task was going to refactor, making the remaining work narrower): narrow the task description to only what remains, re-run COMPLEXITY_EVAL on the updated description, update the label if it changed. Add: `**Scope narrowed:** [today's date] — [what was already addressed by Task #[TASK_NUM]]`
+- **Unaffected** — no overlap: leave as-is, no annotation
+
+Print only if anything changed in Pass 1 or 2:
+```
+─────────────────────────────────────────────────────────────
+  TRIAGE — after Task #[TASK_NUM]
+  Labels written: [N] (tasks that had no Complexity field)
+  Labels updated: [N] (Full → Direct)
+  Resolved by completion: Task #NNN — [reason]
+  Scope narrowed: Task #NNN — [what changed]
+─────────────────────────────────────────────────────────────
+```
+If nothing changed in either pass: silent.
+
+**Pass 3 — Priority reorder (CTO discretion):**
 
 Read all non-COMPLETE tasks from `.autocode/tasks.md` (across all batches). Read the current survey output (from Step 4.3 if it ran, or `.autocode/map.md` if it exists), agent memories, and AUDIT_TRENDS.
 
