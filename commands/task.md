@@ -39,9 +39,10 @@ Also check the task block for a `**Audit findings —` or `**WorldClass deductio
 **Step 0.2 — Read cycle log:**
 Read `.autocode/agents/cto.md`. In `## Task Cycle Log`, find entry for Task #TASK_NUM.
 CYCLE_HISTORY = all cycle entries found (or "None — first cycle").
-AUDIT_CYCLE = count of cycle entries whose header does NOT contain "WorldClass MAX_CYCLES" + 1.
-WC_CYCLE = 0. (Session variable — resets to 0 every time /task is invoked. Cap is per invocation, not per task lifetime. Re-running /task #N always gives a fresh 5 WC attempts.)
-CURRENT_CYCLE = AUDIT_CYCLE. (WC_CYCLE is tracked separately — WorldClass loops never count against the audit escalation limit.)
+AUDIT_CYCLE = 1. (Session variable — resets to 1 every time /task is invoked. Re-running /task #N always gives a fresh 5 audit attempts regardless of prior history.)
+WC_CYCLE = 0. (Session variable — resets to 0 every time /task is invoked. Re-running /task #N always gives a fresh 5 WC attempts.)
+CURRENT_CYCLE = AUDIT_CYCLE.
+Note: CYCLE_HISTORY is still read from cto.md for failure mode diagnosis (Step 0.5) — historical context helps the build agent avoid repeating past mistakes. But the escalation caps are per-session only.
 
 **Step 0.3 — Read agent memories:**
 MEMORY_SECURITY ← `.autocode/agents/security.md` (or "None")
