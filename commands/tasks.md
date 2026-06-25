@@ -13,6 +13,7 @@ Manage the development team's task list. The task is: $ARGUMENTS
 - `/tasks update` — regenerate the task list using existing agent memories (lighter than /meet)
 - `/tasks batch N` — print all tasks in a specific batch
 - `/tasks open` — print only open tasks from the current sprint
+- `/tasks debt` — display the full debt register (deferred WorldClass gaps)
 
 ---
 
@@ -26,6 +27,7 @@ Parse $ARGUMENTS:
 - Equals `update` → MODE = update
 - Starts with `batch` → MODE = batch, BATCH_NUM = [number]
 - Equals `open` → MODE = open
+- Equals `debt` → MODE = debt
 
 ---
 
@@ -198,6 +200,43 @@ If task is COMPLETE:
      Run: /task #[TASK_NUM]  or  /audit #[TASK_NUM]
    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    ```
+
+---
+
+## MODE: debt
+
+Read `.autocode/debt.md`. If not found or contains no data rows:
+```
+No debt items recorded yet.
+Debt items are auto-logged when WorldClass deductions appear — severity 1-3 silently,
+severity ≥ 4 when explicitly accepted at the carry-forward gate.
+```
+Stop.
+
+Parse each data row: date, source_task, category, description, severity, complexity, reason.
+
+Print a box-drawing table (same column widths across all rows — pad with spaces, never let columns vary):
+
+```
+Debt Register — [N] item(s)
+┌────────────┬──────────────┬───────────────┬──────────────────────────────────────────┬──────────┬─────────────┬──────────────────────────────┐
+│ Date       │ Source Task  │ Category      │ Description                              │ Severity │ Complexity  │ Reason                       │
+├────────────┼──────────────┼───────────────┼──────────────────────────────────────────┼──────────┼─────────────┼──────────────────────────────┤
+│ 2026-06-25 │ Task #003    │ tests         │ Missing edge case for expired token      │ 2        │ ⚡ Direct   │ auto — minor WorldClass      │
+│ 2026-06-25 │ Task #003    │ code-quality  │ Hardcoded timeout value                  │ 3        │ ⚡ Direct   │ auto — minor WorldClass      │
+│ 2026-06-24 │ Task #001    │ async         │ No timeout on external API call          │ 5        │ 🔧 Full     │ not blocking — revisit Q3    │
+└────────────┴──────────────┴───────────────┴──────────────────────────────────────────┴──────────┴─────────────┴──────────────────────────────┘
+
+By category:
+  tests: 1 item · avg severity 2.0
+  code-quality: 1 item · avg severity 3.0
+  async: 1 item · avg severity 5.0
+
+⚡ Direct items: [N]  (batchable into nearby tasks — surfaced automatically at Step 0.0b)
+🔧 Full items: [N]   (require a dedicated task — consider adding to the next batch)
+```
+
+Truncate Description to 40 chars + `...` if longer. Truncate Reason to 28 chars + `...` if longer.
 
 ---
 

@@ -35,6 +35,39 @@ If no Complexity field:
   If Direct: show the warning above and wait for yes/no input.
   If Full: proceed to Step 0.1 silently.
 
+**Step 0.0b — Debt review:**
+
+> `debt.md` is the register of deferred WorldClass gaps. It lives at `.autocode/debt.md` and contains:
+> - Severity 1-3 deductions auto-logged silently from every WorldClass run (minor, cosmetic)
+> - Severity ≥ 4 deductions explicitly accepted as debt by Max (with reason)
+> Each entry has a Complexity label. **Direct** items are candidates for casual batching into nearby tasks. **Full** items require their own dedicated task. Run `/tasks debt` to review the full register at any time.
+
+Read `.autocode/debt.md`. If it doesn't exist or has no data rows: skip this step.
+
+Find entries where EITHER:
+- The Source Task's files match the current task's `**File:**` field, OR
+- The category matches the current task's domain (security task → security/auth; QA task → tests/edge-case; architecture task → async/data-loss/error-handling; code task → code-quality)
+
+Filter to Complexity: Direct entries only.
+
+If any matching Direct entries found:
+```
+──────────────────────────────────────────────────────
+  DEBT REVIEW — [N] related Direct item(s) in debt.md
+──────────────────────────────────────────────────────
+  While in this area, you could also address:
+  [1] severity [N] | [category] | [description] (from Task #[source])
+  [2] severity [N] | [category] | [description] (from Task #[source])
+  ...
+  Add to this task's scope?  [numbers, comma-separated] / no
+──────────────────────────────────────────────────────
+```
+Wait for input.
+- If numbers selected: append those items as a scope note in TASK_DEFINITION. Remove the selected rows from `.autocode/debt.md`.
+- If no: proceed silently.
+
+If no matching Direct entries: skip silently.
+
 **Step 0.1 — Read task definition:**
 Read `.autocode/tasks.md`. Find Task #TASK_NUM.
 Extract: TASK_DEFINITION (full block), DONE_WHEN ("Done when:" line), TASK_FILES ("File:" line).
@@ -466,10 +499,17 @@ If **yes**:
     `| [today's date] | Task #[TASK_NUM] | Task #[NEXT_NUM] | [category] | [description] | [severity] |`
 
   For each ACCEPTED-DEBT item:
-  - Append to `.autocode/debt.md` (create with header `# Accepted Technical Debt\n| Date | Source Task | Category | Description | Severity | Reason |\n|------|------------|---------|-------------|---------|---------|` if not exists):
-    `| [today's date] | Task #[TASK_NUM] | [category] | [description] | [severity] | [reason provided] |`
+  - Append to `.autocode/debt.md` (create with header `# Accepted Technical Debt\n| Date | Source Task | Category | Description | Severity | Complexity | Reason |\n|------|------------|---------|-------------|---------|-----------|---------|` if not exists):
+    `| [today's date] | Task #[TASK_NUM] | [category] | [description] | [severity] | [run COMPLEXITY_EVAL on description → Direct/Full] | [reason provided] |`
 
-  Print: `✓ Carry-forward: [N] task(s) added to end of Batch [N] (#[NUM1], #[NUM2], ...) | Accepted debt: [N] item(s) logged`
+  **Auto-log minor deductions (severity 1-3, silent — no gate, no tasks):**
+  Re-read the `**WorldClass deductions —**` block and extract all lines with severity 1-3. For each:
+  - Run COMPLEXITY_EVAL on the deduction description
+  - Append to `.autocode/debt.md` (same schema as above — create if not exists):
+    `| [today's date] | Task #[TASK_NUM] | [category] | [description] | [severity] | [Direct/Full from COMPLEXITY_EVAL] | auto — minor WorldClass deduction |`
+  No prompt. No output. Silent append only.
+
+  Print: `✓ Carry-forward: [N] task(s) added to end of Batch [N] (#[NUM1], #[NUM2], ...) | Accepted debt: [N] item(s) logged | Minor deductions: [N] item(s) auto-logged to debt.md`
 
   Run: `/reflect Task #[TASK_NUM]: [TASK_DEFINITION first line]`
   Edit `.autocode/tasks.md`: add `**Status: COMPLETE — [today's date]**` below Task #TASK_NUM Owner line.
@@ -524,6 +564,26 @@ If ALL tasks in the batch are COMPLETE:
   ```
 
 If not all tasks in the batch are COMPLETE: skip silently — survey fires only at full batch boundaries.
+
+**Debt threshold check (runs every task close, not just batch boundaries):**
+
+Read `.autocode/debt.md`. Count total data rows and rows per category. If the file doesn't exist: skip.
+
+If any category has 5 or more entries, OR total rows ≥ 15:
+```
+┌──────────────────────────────────────────────────────────────┐
+│  DEBT THRESHOLD REACHED                                      │
+│  [category]: [N] items  (threshold: 5 per category)         │
+│  — and/or —                                                  │
+│  Total: [N] items  (threshold: 15)                           │
+│                                                              │
+│  Consider adding a debt-clearing task to the next batch.     │
+│  Run /tasks debt to review all items.                        │
+└──────────────────────────────────────────────────────────────┘
+```
+Do NOT auto-create a task. Surface the warning; Max decides whether to act.
+
+If below threshold: silent.
 
 **Step 4.4 — Post-completion triage:**
 
