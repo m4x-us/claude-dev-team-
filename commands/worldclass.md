@@ -16,6 +16,10 @@ mkdir -p .autocode
 
 Read `~/.claude/autocode/philosophy.md` in full. Capture as `PROJECT_PHILOSOPHY`.
 
+**Invocation mode detection:**
+If $ARGUMENTS starts with `Task #` (called by /task as `Task #001: description`): `MODE = "orchestrated"`. Extract TASK_NUM from the `#NNN` portion.
+Otherwise: `MODE = "standalone"`. If $ARGUMENTS contains a task number (`#\d+` or bare integer): extract as TASK_NUM. If no task number found: TASK_NUM = nil.
+
 If `scripts/deep-audit.sh` exists, run it on the changed files before scoring.
 If `scripts/shipping-gate.sh` exists, run it on the changed directory before scoring.
 
@@ -395,6 +399,27 @@ Run /team-health to see the full escalation queue.
 Outstanding deductions:
 [list the remaining deductions from the most recent scoring cycle]
 ```
+
+If `MODE = "standalone"` AND TASK_NUM is set:
+  Open `.autocode/tasks.md`. Find the `### Task #[TASK_NUM]` block.
+  Find the line immediately after the `**Owner:**` line.
+  Remove any existing `**WorldClass deductions —` block if present.
+  Insert:
+    `**WorldClass deductions — [today's date]** ([95 - COMBINED_SCORE] pts from 95, [N] deductions pending fix):`
+    For each deduction ≥ -2 pts from the most recent scoring cycle (Architecture and Vibes combined):
+    `- [category] [description] — severity [N] (-[pts] pts)`
+  Print:
+  ─────────────────────────────────────────────────────────────
+    WorldClass: [COMBINED_SCORE]/100 (need 95). Deductions written to Task #[TASK_NUM].
+    Send to the dev team to close the gap?
+
+      yes → /task #[TASK_NUM] starts a fix cycle now
+      no  → stop here, review deductions above first
+  ─────────────────────────────────────────────────────────────
+  Wait for user input.
+  If no: stop.
+  If yes: run `/task #[TASK_NUM]`. Stop.
+
 Stop.
 
 ---

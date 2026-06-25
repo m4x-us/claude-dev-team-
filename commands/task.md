@@ -16,7 +16,7 @@ If not found: "Task #N not found in .autocode/tasks.md" → stop.
 
 If task status is COMPLETE: "Task #N is already marked complete. Run /audit #N to re-audit, or /tasks reopen #N first." Stop.
 
-Also check the task block for a `**Audit findings —` line. If found, extract all bullet lines beneath it as PENDING_FINDINGS. These are findings from a prior standalone audit written there by /audit — treat them as the cycle history for this run so the build agent knows exactly what to fix.
+Also check the task block for a `**Audit findings —` or `**WorldClass deductions —` line. If either is found, extract all bullet lines beneath it as PENDING_FINDINGS. If both exist, combine them. These are findings from a prior standalone /audit or /worldclass run — treat them as the cycle history so the build agent knows exactly what to fix.
 
 **Step 0.2 — Read cycle log:**
 Read `.autocode/agents/cto.md`. In `## Task Cycle Log`, find entry for Task #TASK_NUM.
@@ -324,7 +324,7 @@ If **no**: stop. Task remains In Progress.
 If **yes**:
   Run: `/reflect Task #[TASK_NUM]: [TASK_DEFINITION first line]`
   Edit `.autocode/tasks.md`: add `**Status: COMPLETE — [today's date]**` below Task #TASK_NUM Owner line.
-  If a `**Audit findings —` block exists in this task: remove it — findings are resolved.
+  If a `**Audit findings —` or `**WorldClass deductions —` block exists in this task: remove it — findings are resolved.
   Update cto.md Task Cycle Log: change `Status: In Progress | Cycle N` → `Status: COMPLETE | Cycle N | Completed: [today's date]`
   Proceed to Step 4.2.
 
