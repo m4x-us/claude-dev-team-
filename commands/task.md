@@ -40,7 +40,7 @@ Also check the task block for a `**Audit findings —` or `**WorldClass deductio
 Read `.autocode/agents/cto.md`. In `## Task Cycle Log`, find entry for Task #TASK_NUM.
 CYCLE_HISTORY = all cycle entries found (or "None — first cycle").
 AUDIT_CYCLE = count of cycle entries whose header does NOT contain "WorldClass MAX_CYCLES" + 1.
-WC_CYCLE = count of cycle entries whose header contains "WorldClass MAX_CYCLES".
+WC_CYCLE = 0. (Session variable — resets to 0 every time /task is invoked. Cap is per invocation, not per task lifetime. Re-running /task #N always gives a fresh 5 WC attempts.)
 CURRENT_CYCLE = AUDIT_CYCLE. (WC_CYCLE is tracked separately — WorldClass loops never count against the audit escalation limit.)
 
 **Step 0.3 — Read agent memories:**
@@ -319,10 +319,24 @@ If WORLDCLASS_RESULT.verdict = "MAX_CYCLES":
     `New findings introduced: — | Regression signal: NO`
     `CTO diagnosis run: NO — WorldClass quality gap, not a repeated audit finding`
 
-  **Step 3.4 — Increment WC_CYCLE and return:**
-  Increment WC_CYCLE. Do NOT increment AUDIT_CYCLE — WorldClass loops are uncapped.
-  Return to Phase 1 Step 1.1. The build agent receives the WorldClass deductions via CYCLE_HISTORY and must fix them before the audit re-runs.
-  There is no escalation trigger for WC_CYCLE. WorldClass runs until it passes.
+  **Step 3.4 — Increment WC_CYCLE and check session cap:**
+  Increment WC_CYCLE. Do NOT increment AUDIT_CYCLE.
+
+  If WC_CYCLE >= 5:
+    WorldClass has not reached 95 after 5 attempts this session. Stop looping.
+    Print:
+    ─────────────────────────────────────────────────────────────
+      WorldClass hit 5 attempts this session. Current score: [COMBINED_SCORE]/100.
+      Deductions remain on Task #[TASK_NUM] in tasks.md.
+
+      Run /task #[TASK_NUM] again for a fresh 5 attempts.
+      Or accept current score and close the task? yes / no
+    ─────────────────────────────────────────────────────────────
+    Wait for user input.
+    If yes: proceed to Phase 4 (mark complete at current score).
+    If no: stop. Task stays open. Run /task #[TASK_NUM] again when ready.
+
+  If WC_CYCLE < 5: return to Phase 1 Step 1.1. The build agent receives the WorldClass deductions via CYCLE_HISTORY and must fix them before the audit re-runs.
 
 ---
 
