@@ -1,16 +1,17 @@
 # Patterns — Health Report Generator
 
-Read `.autocode/patterns.md` in the current project, analyze recurring findings, and generate a visual HTML health report. Then run the interactive philosophy graduation steps in the terminal.
+Read `.autocode/patterns.md`, analyze recurring findings, and generate a visual HTML health report. Then run the interactive philosophy graduation steps in the terminal.
 
 ---
 
-## PHASE 0: READ ALL DATA (silent — do not print yet)
+## PHASE 0: READ ALL DATA (silent)
 
 Read `.autocode/patterns.md` → `PATTERNS_RAW`. If it doesn't exist or is empty: print "No pattern data yet. Run /task on a few tasks first." Stop.
 
 Read `.autocode/trends.md` → `TRENDS_RAW` (or "None").
 Read `.autocode/worldclass-trends.md` → `WORLDCLASS_RAW` (or "None").
 Read `.autocode/reflections.md` → `REFLECTIONS_RAW` (or "None").
+Read `~/.claude/autocode/philosophy.md` → `PHILOSOPHY_RAW` (or "None").
 
 ---
 
@@ -19,33 +20,81 @@ Read `.autocode/reflections.md` → `REFLECTIONS_RAW` (or "None").
 **1A — Parse patterns.md:**
 
 Parse every bullet line matching: `^-\s+(\S+)\s+(.+)—\s+severity\s+(\d+)\s*\|`
+
+For each matching line, extract:
+- `category` — first token
+- `description` — text between category and the em dash
+- `severity` — integer after "severity"
+- `task_header` — the `## [date] | Task: [...]` header immediately above this bullet
+- `cycle_index` — the sequential audit run number this entry belongs to (1-based, derived from audit_rows order in 1B)
+
 Group by category. For each category compute:
-- `occurrences` — count of matching lines
-- `tasks` — unique task identifiers extracted from the `## [date] | Task: [...]` header above each bullet
-- `avg_severity` — mean of all severity values in that category
+- `occurrences` — total count of matching lines
+- `cycle_indices` — set of distinct cycle_index values where this category appeared
+- `unique_cycles` — count of distinct cycle_indices
+- `avg_severity` — mean of all severity values
 - `max_severity` — highest severity seen
-- `last_seen_task` — task identifier from the most recent entry
+- `last_seen_cycle` — highest cycle_index where it appeared
+- `per_cycle_counts` — array of (cycle_index, count) for chart plotting
 
-Systemic patterns = categories where `occurrences >= 3` AND the entries span `>= 2` different tasks.
+**Systemic pattern threshold:** A category qualifies if `occurrences >= 3` AND `unique_cycles >= 3`. Reasoning: each cycle is a fresh build attempt — if the build agent makes the same category of mistake across 3 independent cycles, the coding prompts are not catching it. A single hard task that takes 10 cycles but only generates 1 type of finding in all 10 cycles counts as unique_cycles=10, so it still qualifies after 3 cycles — that IS a prompt gap.
 
-**1B — Parse trends.md:**
+**1B — Parse trends.md into audit_rows:**
 
-Parse each data row (skip header). Extract: date, task (first 40 chars), cycles, final_severity, verdict (PASS / FAIL / MAX_CYCLES).
-- `pass_rate` = PASS count / total × 100 (round to 1 decimal)
+Parse each data row (skip header). Extract in order: date, task (first 40 chars), cycles_this_task (the Cycles column), final_severity, verdict.
+
+Compute `cumulative_cycle_end` for each row — running sum of cycles_this_task across all rows in order:
+- Row 1: cycles_this_task=2 → cumulative_cycle_end=2
+- Row 2: cycles_this_task=3 → cumulative_cycle_end=5
+- Row 3: cycles_this_task=1 → cumulative_cycle_end=6
+- etc.
+
+`cumulative_cycle_start` for row N = cumulative_cycle_end of row N-1 (or 0 for first row).
+
+The X axis for all time-based charts is `cumulative_cycle_end` — NOT dates. This makes the timeline reflect actual work done, not calendar time.
+
+Also compute:
+- `total_cycles` = final cumulative_cycle_end
+- `pass_rate` = PASS count / total count × 100
 - `avg_severity_recent` = mean of last 5 final_severity values
-- `trend_direction` = compare avg of last 3 vs prior 3 (need 6+ rows): IMPROVING / STABLE / DEGRADING / "Not enough data"
-- `audit_rows` = array of {date, task, cycles, severity, verdict} for chart
+- `trend_direction` = compare avg of last 3 vs prior 3 (need 6+): IMPROVING / STABLE / DEGRADING / "Not enough data"
 
-**1C — Parse worldclass-trends.md:**
+**1C — Parse worldclass-trends.md into wc_rows:**
 
-Parse each data row. Extract: date, task, cycles, score, verdict.
-- `avg_score_recent` = mean of last 5 scores (PASS rows only)
+Parse each data row. Extract: date, task, cycles_this_task, score, verdict.
+
+Compute `wc_cumulative_cycle_end` using the same running-total logic as 1B (use cycles_this_task column, same approach).
+
 - `wc_trend_direction` = compare avg of last 3 vs prior 3 PASS rows: IMPROVING / STABLE / DEGRADING / "Not enough data"
-- `wc_rows` = array of {date, task, score, verdict} for chart
 
-**1D — Plain English translations:**
+**1D — Count severe findings per audit run:**
 
-Use this mapping for every category name displayed to the user:
+For each audit run in `audit_rows` (identified by date + task header match in patterns.md):
+- Find all bullet lines in PATTERNS_RAW under the `## [date] | Task: [task]` header
+- Count lines with severity >= 7 → `severe_count` for that run
+- Count lines with severity >= 5 → `medium_plus_count`
+
+Attach `severe_count` and `medium_plus_count` to each row in `audit_rows`. Use `cumulative_cycle_end` as the X coordinate.
+
+`SEVERE_SERIES` = array of {x: cumulative_cycle_end, y: severe_count} for every audit_row.
+
+**1E — Philosophy change annotations:**
+
+Read PHILOSOPHY_RAW. Find the `## CHANGELOG` section. Parse each table row:
+`| date | section | one-line summary | pattern info |`
+
+For each changelog entry:
+1. Find the first `audit_row` with date >= changelog_date
+2. Use that row's `cumulative_cycle_end` as the annotation's cycle position
+3. Translate `one-line summary` into plain English (remove jargon — write it as if explaining to a business owner what rule was added and why)
+
+`PHILOSOPHY_ANNOTATIONS` = array of {cycle: N, label: "plain English description"} sorted by cycle ascending.
+
+If no changelog entries found or PHILOSOPHY_RAW = "None": `PHILOSOPHY_ANNOTATIONS = []`.
+
+**1F — Plain English translations:**
+
+Category name mapping (apply everywhere — never show raw names to the user):
 - `error-handling` → "Error Protection"
 - `tests` → "Test Quality"
 - `auth` → "Access Control"
@@ -58,9 +107,9 @@ Use this mapping for every category name displayed to the user:
 - `performance` → "Speed & Efficiency"
 - `requirements` → "Feature Completeness"
 - `documentation` → "Documentation"
-- Any unmapped category → title-case the raw name
+- Any unmapped → title-case the raw name
 
-Business impact per category (one sentence, non-technical):
+Business impact per category (one sentence, plain English):
 - `error-handling` → "The app may crash silently or show confusing error messages to customers."
 - `tests` → "Bugs may go undetected until customers find them in production."
 - `auth` → "The wrong users may be able to access data they shouldn't see."
@@ -74,24 +123,23 @@ Business impact per category (one sentence, non-technical):
 - `requirements` → "Finished features may not fully match what was originally requested."
 - `documentation` → "The team loses context and makes avoidable mistakes on existing code."
 
-Severity badge (based on `avg_severity`):
+Severity badge (based on avg_severity):
 - 1.0–3.4 → label: "Low Priority", color: #3b82f6
 - 3.5–5.4 → label: "Worth Fixing", color: #f59e0b
 - 5.5–6.9 → label: "Fix Soon", color: #f97316
 - 7.0–8.4 → label: "Fix Now", color: #ef4444
-- 8.5–10 → label: "Critical", color: #7f1d1d
+- 8.5–10  → label: "Critical", color: #7f1d1d
 
 Overall health (based on systemic pattern count):
-- 0–2 → "HEALTHY", color: #22c55e, emoji: ✅
+- 0–2 systemic patterns → "HEALTHY", color: #22c55e, emoji: ✅
 - 3–4 → "NEEDS ATTENTION", color: #f59e0b, emoji: ⚠️
-- 5+ → "SIGNIFICANT DRIFT", color: #ef4444, emoji: 🔴
+- 5+  → "SIGNIFICANT DRIFT", color: #ef4444, emoji: 🔴
 
-**1E — Executive summary bullets (3 sentences, plain English, no jargon):**
+**1G — Executive summary (3 plain English sentences, no jargon):**
 
-Compose from the data:
-1. Pass rate sentence: "Your dev team has passed [pass_rate]% of recent audits" — or if no data "No audit history yet."
-2. Most recurring issue: "The most common issue is [plain English category] — it has appeared [N] times across [N] tasks." — or "No recurring issues yet."
-3. Trend sentence: "Quality is [IMPROVING → getting better / STABLE → holding steady / DEGRADING → getting worse]." Combine both audit and worldclass trends. If not enough data: "Not enough history yet to show a trend."
+1. Pass rate: "Your dev team has passed [pass_rate]% of recent audits." Or "No audit history yet."
+2. Most recurring issue: "The most common issue is [plain English category] — it has appeared [N] times across [N] audit cycles." Or "No recurring issues yet."
+3. Trend: "Quality is [IMPROVING → getting better / STABLE → holding steady / DEGRADING → getting worse] over the last several tasks." If not enough data: "Not enough history yet to show a trend."
 
 ---
 
@@ -99,92 +147,223 @@ Compose from the data:
 
 Create directory: `mkdir -p .autocode/reports`
 
-Generate a complete self-contained HTML file and write it to `.autocode/reports/patterns-[today's date].html`.
+Generate a complete self-contained HTML file. Write to `.autocode/reports/patterns-[today's date].html`.
 
-The file must be entirely self-contained — no external file dependencies except CDN links (Chart.js and Google Fonts, both loaded via HTTPS). All data is embedded as JavaScript variables. The file must render correctly when opened directly in a browser via `open`.
+The file must be entirely self-contained. No external file dependencies except two CDN links: Chart.js (`https://cdn.jsdelivr.net/npm/chart.js`) and Google Fonts Inter (`https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap`). All chart data is embedded as JavaScript variables in a `<script>` block. The file must render correctly when opened directly with `open` — no server required.
 
-**PAGE STRUCTURE:**
+---
 
-The HTML page has the following sections in order. Use a dark theme throughout: background #0f172a, card background #1e293b, primary text #f1f5f9, secondary text #94a3b8, border color #334155. Font: Inter from Google Fonts (`https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap`). Load Chart.js from `https://cdn.jsdelivr.net/npm/chart.js`.
+**GLOBAL STYLE:**
 
-**HEADER SECTION:**
-- Left side: "Codebase Health Report" in large bold text (28px), below it the date in secondary color
-- Right side: large health badge — pill shape, background = health color at 20% opacity, border = health color, text = health emoji + " " + health label in health color (e.g. "✅ HEALTHY"). Font size 16px, padding 8px 20px, border-radius 999px.
-- Full-width horizontal rule below
+Dark theme throughout. CSS variables at `:root`:
+- `--bg`: #0f172a
+- `--card`: #1e293b
+- `--card-alt`: #243044
+- `--border`: #334155
+- `--text`: #f1f5f9
+- `--text-muted`: #94a3b8
+- `--green`: #22c55e
+- `--yellow`: #f59e0b
+- `--orange`: #f97316
+- `--red`: #ef4444
+- `--blue`: #3b82f6
+- `--purple`: #a855f7
 
-**EXECUTIVE SUMMARY SECTION:**
-- Section heading: "At a Glance" (18px, medium weight, secondary color, uppercase, letter-spacing)
-- Three cards in a row (or stacked on narrow screens). Each card: white icon on left (use simple Unicode: 📊 📋 📈), plain English sentence on right. Card background #1e293b, border-radius 12px, padding 16px 20px.
+Body: background var(--bg), font Inter, color var(--text), margin 0, padding 24px.
+Max-width 1200px, centered with `margin: 0 auto`.
+All cards: background var(--card), border-radius 12px, border 1px solid var(--border), padding 20px 24px.
 
-**HABITS TO FIX SECTION:**
-Show only if systemic patterns exist (occurrences >= 3 AND spans >= 2 tasks). Heading: "Habits to Fix" with count badge.
-One card per systemic pattern, sorted by avg_severity descending. Each card contains:
-- Top row: plain English category name (600 weight, 17px) on left, severity badge pill on right
-- Business impact sentence in secondary color (14px), italic
-- Stats row: "Appeared [N] times" · "Across [N] tasks: [task list]" · "Last seen: [task]"
-- Thin colored left border = severity badge color
+---
 
-If no systemic patterns: show a green card "No repeating habits — every issue so far has been a one-off."
+**SECTION 1 — HEADER:**
 
-**CHARTS SECTION — "By the Numbers":**
+Full-width flex row, space-between alignment, padding-bottom 20px, border-bottom 1px solid var(--border).
 
-Four charts in a 2×2 grid (2 columns on wide screens, 1 column on narrow). Each chart in its own card with a plain English title and subtitle.
+Left side:
+- "Codebase Health Report" — font-size 26px, font-weight 700
+- "[today's date]  ·  [total_cycles] total cycles" — font-size 14px, color var(--text-muted), margin-top 4px
 
-Chart 1 — "Issues by Type" (horizontal bar chart):
-- Title: "Issues by Type", subtitle: "How many times each problem category appeared"
-- Data: all categories from patterns.md, sorted by occurrences descending
-- X axis: count (integers), Y axis: plain English category names
-- Bar color: severity badge color for that category's avg_severity
-- Show value labels at end of each bar
+Right side — health badge:
+- Pill shape: border-radius 999px, padding 8px 20px, border 1.5px solid [health color], background [health color] at 15% opacity
+- Text: "[health emoji]  [health label]" — font-size 15px, font-weight 600, color [health color]
 
-Chart 2 — "Audit Pass Rate" (doughnut chart):
+---
+
+**SECTION 2 — EXECUTIVE SUMMARY ("At a Glance"):**
+
+Section label: "AT A GLANCE" — font-size 11px, letter-spacing 0.1em, color var(--text-muted), font-weight 600, text-transform uppercase, margin-bottom 12px.
+
+Three cards in a horizontal flex row (wrap on narrow screens), gap 16px. Each card: flex row, gap 16px, align-items center.
+
+Left side of each card: 40×40px circle, background the card's accent color at 20% opacity, centered icon (Unicode emoji, font-size 20px).
+- Card 1 icon: 📊, accent color var(--blue)
+- Card 2 icon: 🔁, accent color: severity badge color of most recurring category (or var(--green) if none)
+- Card 3 icon: (IMPROVING → 📈 var(--green)) (STABLE → ➡️ var(--yellow)) (DEGRADING → 📉 var(--red))
+
+Right side: executive summary sentence in var(--text), font-size 15px.
+
+---
+
+**SECTION 3 — SEVERE ISSUES OVER TIME (main chart, full width):**
+
+This is the most important chart. Give it full width and extra vertical space.
+
+Section label: "SEVERE ISSUES OVER TIME" (same uppercase label style as Section 2).
+
+Subtitle below label: "Findings rated 'Fix Now' or worse (severity 7+), measured in cycles. Vertical markers show when coding rules were updated — watch for drops after each change." — font-size 13px, color var(--text-muted), margin-bottom 16px.
+
+Card containing the chart canvas (`id="severeChart"`). Canvas height: 280px.
+
+**Chart.js configuration for severeChart:**
+- Type: `line`
+- Data:
+  - Dataset 1 — "Severe Issues":
+    - data: SEVERE_SERIES array [{x, y}]
+    - borderColor: #ef4444
+    - backgroundColor: rgba(239,68,68,0.12) fill
+    - tension: 0.3
+    - pointRadius: 5
+    - pointBackgroundColor: color each point — #22c55e if y=0, #f59e0b if y=1-2, #ef4444 if y>=3
+  - Dataset 2 — zero line (invisible reference):
+    - data: [{x:0,y:0},{x:total_cycles,y:0}]
+    - borderColor: transparent, pointRadius: 0
+- Scales:
+  - x: type `linear`, title "Cycle Number", min 0, max total_cycles (or 10 if no data), grid color rgba(255,255,255,0.05)
+  - y: type `linear`, title "Severe Issues Found", min 0, suggestedMax 6, ticks integer only, grid color rgba(255,255,255,0.05)
+- Plugins:
+  - annotation plugin (load from `https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation`):
+    For each entry in PHILOSOPHY_ANNOTATIONS:
+      - Vertical line at x = entry.cycle
+      - borderColor: rgba(168,85,247,0.7) (purple), borderWidth: 2, borderDash: [6,4]
+      - Label: displayed above the line, background rgba(168,85,247,0.15), color #a855f7, content: "📌 Cycle [entry.cycle]", font-size 11px
+  - tooltip: custom tooltip showing "Cycle [x]: [y] severe issues"
+- Legend: hidden (explained by annotation legend below)
+
+**Annotation legend below the chart (outside the canvas, inside the card):**
+Flex row, gap 24px, margin-top 12px, font-size 13px, color var(--text-muted):
+- "● Red = 3+ severe issues  ● Yellow = 1–2  ● Green = clean"
+- "┊ Purple line = coding rules updated"
+
+**Philosophy change log — below the chart card:**
+
+If PHILOSOPHY_ANNOTATIONS is non-empty: render a timeline list of all annotations.
+Section heading: "What Changed at Each Marker" — font-size 13px, font-weight 600, color var(--text-muted), uppercase, letter-spacing, margin-bottom 10px.
+
+For each annotation (sorted by cycle ascending):
+One row: purple left border (3px solid #a855f7), padding-left 14px, margin-bottom 10px.
+- "Cycle [N]" — font-size 13px, font-weight 600, color #a855f7
+- plain English description — font-size 14px, color var(--text), margin-top 2px
+
+If PHILOSOPHY_ANNOTATIONS is empty: show a muted note "No coding rule changes recorded yet. When you approve a rule in /patterns, it will appear here."
+
+---
+
+**SECTION 4 — CHARTS GRID (2×2):**
+
+2-column CSS grid (1 column on narrow screens), gap 16px.
+
+**Chart A — "Issues by Type" (horizontal bar):**
+- Title: "Issues by Type" (16px, 600 weight), subtitle: "How many times each problem appeared across all cycles" (13px muted)
+- Canvas `id="typeChart"`, height 240px
+- Data: all categories sorted by occurrences descending. Y axis: plain English names. X axis: count.
+- Bar color per category: severity badge color for avg_severity
+- Show data value labels at end of each bar (white, 12px)
+- If no data: placeholder text "No findings recorded yet."
+
+**Chart B — "Audit Results" (doughnut):**
 - Title: "Audit Results", subtitle: "Pass vs fail across all runs"
-- Data: PASS count, FAIL count, MAX_CYCLES count
-- Colors: #22c55e for PASS, #ef4444 for FAIL, #f97316 for MAX_CYCLES
-- Center text (plugin or CSS): large pass_rate% number, "pass rate" below it in secondary color
-- If no trend data: show placeholder "No audit history yet"
+- Canvas `id="auditDonut"`, height 200px
+- Data: PASS count (#22c55e), FAIL count (#ef4444), MAX_CYCLES count (#f97316)
+- Center overlay text (absolute positioned over canvas center): "[pass_rate]%" in 28px bold, "pass rate" in 12px muted below
+- If no trend data: placeholder "No audit history yet."
 
-Chart 3 — "Audit Severity Over Time" (line chart):
-- Title: "Audit Quality Over Time", subtitle: "Lower severity = fewer serious issues found (better)"
-- Data: audit_rows array — X axis dates, Y axis final_severity values
-- Line color: #3b82f6, fill below line at 10% opacity
-- Points colored by verdict: green for PASS, red for FAIL, orange for MAX_CYCLES
-- Y axis: 0–10, label each tick (1=Trivial, 5=Medium, 8=Critical)
-- Horizontal dashed reference line at y=5 labeled "Concern threshold"
-- If fewer than 2 rows: show placeholder "Need more runs to show trend"
+**Chart C — "WorldClass Scores" (line):**
+- Title: "WorldClass Scores", subtitle: "Target is 95 — higher is better"
+- Canvas `id="wcChart"`, height 200px
+- X axis: wc_cumulative_cycle_end (integer, label "Cycle")
+- Y axis: score 0–100
+- Line: color #a855f7, fill rgba(168,85,247,0.08)
+- Points: green if ≥95, yellow if 80–94, red if <80, radius 5
+- Horizontal dashed reference line at y=95: color #22c55e, label "World-class" at right edge
+- If fewer than 2 rows: placeholder "Need more runs to show trend."
 
-Chart 4 — "WorldClass Scores" (line chart):
-- Title: "WorldClass Scores Over Time", subtitle: "Target: 95/100 — are we getting there?"
-- Data: wc_rows — X axis dates, Y axis score values
-- Line color: #a855f7, fill below at 10% opacity
-- Points colored: green if score >= 95, yellow if 80-94, red if < 80
-- Y axis: 0–100
-- Horizontal dashed line at y=95 labeled "World-class threshold" in #22c55e
-- If fewer than 2 rows: show placeholder "Need more runs to show trend"
+**Chart D — "Audit Severity Trend" (line):**
+- Title: "Audit Severity Over Time", subtitle: "Lower is better — fewer serious issues found"
+- Canvas `id="severityChart"`, height 200px
+- X axis: cumulative_cycle_end (integer, label "Cycle")
+- Y axis: final_severity 0–10
+  - Tick labels: 1="Trivial", 5="Medium", 8="Critical" (only label those three)
+- Line: color #3b82f6, fill rgba(59,130,246,0.08)
+- Points: green if verdict=PASS, red if FAIL, orange if MAX_CYCLES, radius 5
+- Horizontal dashed line at y=5: color rgba(249,115,22,0.5), label "Concern threshold"
+- If fewer than 2 rows: placeholder "Need more runs."
 
-**TASK BREAKDOWN TABLE:**
-- Heading: "Task History"
-- Table columns: Task | Date | Issues Found | Highest Severity | Verdict | WorldClass Score
-- Populate from audit_rows joined with wc_rows on task name (fuzzy match first 40 chars)
-- Row background: #1e293b, alternating slightly lighter #243044
-- Verdict cell: colored pill badge (green/red/orange)
-- Sort: most recent first
-- If no data: "No task history yet."
+---
 
-**PHILOSOPHY CANDIDATES SECTION:**
-Show only if any systemic patterns qualify for graduation (occurrences >= 3, avg severity >= 6, spans >= 2 tasks).
-Heading: "Ready to Become Rules" with subtitle "These issues have appeared enough times that the dev team should add them as permanent coding standards."
-One card per qualifying pattern, plain English, with a "→ See terminal for approval" note.
+**SECTION 5 — HABITS TO FIX:**
+
+Show only if systemic patterns exist (occurrences >= 3, unique_cycles >= 3). Section label: "HABITS TO FIX" with count badge (small pill, var(--red) background at 20%, var(--red) text).
+
+If no systemic patterns: green card "No repeating habits yet — every issue so far has been a one-off. Keep going."
+
+For each systemic pattern sorted by avg_severity descending, one card:
+- Left border: 3px solid [severity badge color]
+- Top row (flex, space-between):
+  - Plain English category name (17px, 600 weight)
+  - Severity badge pill: [label] in [color], border [color], background [color] at 15% opacity, border-radius 999px, padding 3px 12px, font-size 12px
+- Business impact sentence (14px, var(--text-muted), margin-top 6px)
+- Stats row (13px, var(--text-muted), margin-top 10px, flex gap 20px):
+  - "Appeared [occurrences] times"
+  - "Across [unique_cycles] audit cycles"
+  - "Last seen: cycle [last_seen_cycle]"
+- Sparkline (optional — small inline bar): 20 pixels tall, one bar per audit run, height proportional to count in that run, color matching severity. Show last 10 runs only.
+
+---
+
+**SECTION 6 — TASK HISTORY TABLE:**
+
+Section label: "TASK HISTORY".
+
+Table: full width, border-collapse collapse. Columns:
+Task | Cycles Used | Severe Issues | Final Severity | Verdict | WorldClass
+
+Populate from audit_rows (most recent first). For each row:
+- Task: first 45 chars of task name
+- Cycles Used: cycles_this_task
+- Severe Issues: severe_count (color red if >0, green if 0)
+- Final Severity: number (color by value — green ≤3, yellow 4–6, red ≥7)
+- Verdict: pill badge — PASS #22c55e, FAIL #ef4444, MAX_CYCLES #f97316
+- WorldClass: score from wc_rows (match by task name fuzzy first 40 chars), or "—"
+
+Row alternating: var(--card) / var(--card-alt). Header row: background var(--border), font-weight 600.
+If no data: "No task history yet."
+
+---
+
+**SECTION 7 — PHILOSOPHY CANDIDATES (if any qualify):**
+
+Show only if any pattern meets graduation threshold: occurrences >= 3, avg_severity >= 6, unique_cycles >= 3.
+Section label: "READY TO BECOME RULES".
+Subtitle: "These issues have recurred enough times that the team should add them as permanent coding standards. See the terminal to approve or skip each one."
+
+One card per qualifying pattern (plain English name, occurrence count, avg severity). No approve/skip in the HTML — that happens in the terminal.
+
 If none qualify: omit this section entirely.
 
-**TECHNICAL DETAIL SECTION (collapsible):**
-- A collapsed `<details><summary>` block: "Technical Detail (for developers)"
-- Inside: raw patterns.md contents in a `<pre>` block with monospace font, secondary color, smaller font size
-- Not expanded by default
+---
+
+**SECTION 8 — TECHNICAL DETAIL (collapsed):**
+
+`<details><summary style="cursor:pointer; color:var(--text-muted); font-size:13px;">Technical detail (for developers)</summary>`
+Inside: `<pre>` containing PATTERNS_RAW verbatim, font-size 12px, color var(--text-muted), overflow-x auto, white-space pre-wrap.
+Closed by default.
+
+---
 
 **FOOTER:**
-- "Generated by /patterns on [date]" in small secondary text, centered
-- "Open .autocode/reports/ to find previous reports"
+
+Centered, font-size 12px, color var(--text-muted), padding-top 24px, border-top 1px solid var(--border), margin-top 32px.
+"Generated by /patterns on [today's date]  ·  Saved: .autocode/reports/patterns-[date].html  ·  Previous reports in .autocode/reports/"
 
 ---
 
@@ -195,9 +374,10 @@ Run: `open .autocode/reports/patterns-[today's date].html`
 Print in terminal:
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  HEALTH REPORT GENERATED
-  Opened in your browser.
+  HEALTH REPORT OPENED IN BROWSER
   Saved: .autocode/reports/patterns-[date].html
+  Total cycles tracked: [total_cycles]
+  Philosophy markers on chart: [count of PHILOSOPHY_ANNOTATIONS]
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
@@ -207,34 +387,35 @@ Print in terminal:
 
 **Step 4A — Archive prompt:**
 
-Ask in terminal: "Archive this batch and start fresh? (y/n)"
+Ask: "Archive this batch and start fresh? (y/n)"
 
 If yes:
 1. Rename `.autocode/patterns.md` → `.autocode/patterns-archive-[today's date].md`
-2. Create fresh `.autocode/patterns.md` with header: `# AutoCode Patterns Log`
-3. Print: "✅ Archived to patterns-archive-[date].md. Starting fresh."
-
+2. Create fresh `.autocode/patterns.md` with header `# AutoCode Patterns Log`
+3. Print: "✅ Archived. Starting fresh — previous data preserved in patterns-archive-[date].md."
 If no: print "Keeping current data."
+
+Note: trends.md and reflections.md are never archived — permanent longitudinal records.
 
 ---
 
 **Step 4B — Philosophy graduation:**
 
-For each pattern that qualifies (occurrences >= 3 AND avg_severity >= 6 AND spans >= 2 tasks):
+For each pattern qualifying for graduation (occurrences >= 3, avg_severity >= 6, unique_cycles >= 3):
 
 Spawn a single independent agent:
 
 "You are a senior software architect deciding whether a recurring code quality problem deserves a permanent place in a project's coding philosophy.
 
-Recurring pattern: [category, plain English name, occurrence count, avg severity, task list]
+Recurring pattern: [plain English name, raw category, occurrence count, avg severity, unique_cycles]
 
 Current philosophy document:
 [full contents of ~/.claude/autocode/philosophy.md]
 
 Propose the exact text to add to prevent this pattern from recurring. Be specific:
 1. Which section it belongs in
-2. The exact text to add — same voice and format as the existing document
-3. Why this rises to the level of philosophy (not just a one-time fix)
+2. Exact text — same voice and format as the existing document
+3. Why this rises to the level of philosophy (not a one-time fix)
 
 Do not suggest vague guidance. 'Handle errors properly' is useless. Cite the specific scenario, function type, or pattern.
 
@@ -244,11 +425,11 @@ TEXT TO ADD:
 [exact text]
 WHY PHILOSOPHY-LEVEL: [one sentence]"
 
-Print proposal in terminal:
+Print in terminal:
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   PHILOSOPHY CANDIDATE: [plain English name]
-  [N] occurrences · avg severity [N] · [N] tasks
+  [N] occurrences · avg severity [N] · [N] cycles
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   Section: [proposed section]
 
@@ -263,32 +444,31 @@ Ask: "Add this to philosophy.md? (y/n)"
 If yes:
 1. Read `~/.claude/autocode/philosophy.md`
 2. Insert text into correct section
-3. Append to `## CHANGELOG` table: `| [date] | [section] | [one-line summary] | [N occurrences, avg severity N] |`
+3. Append to `## CHANGELOG` table: `| [today's date] | [section] | [one-line summary in plain English] | [N] occurrences, avg severity [N] |`
 4. Write the updated file
-5. Print: "✅ Added to [section]."
+5. Print: "✅ Added to [section]. Will appear as a marker on the chart next time you run /patterns."
 
 If no: print "Skipped."
 
-Present each candidate one at a time. If none qualify: print "No patterns meet the graduation threshold (need 3+ occurrences at avg severity ≥ 6 across 2+ tasks)."
+Present each candidate one at a time. If none qualify: print "No patterns meet the graduation threshold yet (need 3+ occurrences at avg severity ≥ 6 across 3+ cycles)."
 
 ---
 
 **Step 4C — Agent memory updates:**
 
-For each systemic pattern (occurrences >= 3, severity >= 5, spans >= 2 tasks), update the target agent memory:
+For each systemic pattern (occurrences >= 3, severity >= 5, unique_cycles >= 3):
 
-Category → agent mapping:
+Category → agent file:
 - error-handling, feature-flag, async, edge-case, code-quality, performance, data-loss → architect.md
 - tests, requirements → qa.md
 - auth, security → security.md
 - documentation → docs.md
 
-For each target agent file `.autocode/agents/[agent].md`:
-1. If file doesn't exist: skip (print warning)
+For each target `.autocode/agents/[agent].md`:
+1. If file doesn't exist: skip with warning
 2. Find or create `## Known Blind Spots` section
-3. Add or update entry:
-   `- [plain English name]: [N] occurrences, avg severity [N] — [specific watch-for]`
-   `  Last seen: [last_seen_task] | Updated: [today's date]`
+3. Add or update: `- [plain English name]: [N] occurrences, avg severity [N] across [N] cycles — [specific watch-for based on descriptions]`
+   `  Last seen: cycle [last_seen_cycle] | Updated: [today's date]`
 
 Update `.autocode/agents/cto.md` Known Blind Spots column for affected agents.
 
@@ -296,24 +476,24 @@ Print:
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   AGENT MEMORIES UPDATED
-  [list each file updated]
+  [list each file and what was written]
   Agents will now explicitly watch for these patterns.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
-
-Log to `.autocode/patterns.md`:
-`## [today's date] | /patterns feedback — [N] blind spots written to agent memories`
 
 ---
 
 ## RULES
 
 - Never fabricate data — only use what is in the log files
-- Plain English translations are mandatory — never show raw category names in the HTML
+- Plain English translations are mandatory everywhere — never show raw category names in the HTML
+- X axis on all time-based charts is cumulative cycle count, never dates
+- Severe issues chart is always the first and largest chart — it is the primary signal
+- Philosophy annotations must come from the actual CHANGELOG in philosophy.md — never invent markers
 - The HTML file must be self-contained and open without a server
-- CDN links (Chart.js, Google Fonts) are the only external dependencies allowed
-- Charts show "Need more runs" placeholders if data is insufficient — never show empty axes
-- Philosophy updates require the agent's proposal — never write to philosophy.md without spawning the agent
+- Chart.js and chartjs-plugin-annotation from CDN are the only external script dependencies
+- Charts show "Need more runs" placeholders if data is insufficient — never empty axes
+- Systemic pattern threshold requires unique_cycles >= 3 (cross-cycle, not cross-task) — this measures prompt gaps, not task difficulty
+- Previous report files in .autocode/reports/ are never deleted
+- Philosophy updates are permanent — never propose vague or redundant additions
 - Archive prompt always runs before philosophy step
-- Cross-task diversity required for systemic patterns — 3 occurrences on the same task is NOT a systemic pattern
-- Previous report files in .autocode/reports/ are never deleted — accumulate over time
