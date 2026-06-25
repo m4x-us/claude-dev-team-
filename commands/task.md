@@ -39,7 +39,9 @@ Also check the task block for a `**Audit findings —` or `**WorldClass deductio
 **Step 0.2 — Read cycle log:**
 Read `.autocode/agents/cto.md`. In `## Task Cycle Log`, find entry for Task #TASK_NUM.
 CYCLE_HISTORY = all cycle entries found (or "None — first cycle").
-CURRENT_CYCLE = count of existing cycle entries + 1.
+AUDIT_CYCLE = count of cycle entries whose header does NOT contain "WorldClass MAX_CYCLES" + 1.
+WC_CYCLE = count of cycle entries whose header contains "WorldClass MAX_CYCLES".
+CURRENT_CYCLE = AUDIT_CYCLE. (WC_CYCLE is tracked separately — WorldClass loops never count against the audit escalation limit.)
 
 **Step 0.3 — Read agent memories:**
 MEMORY_SECURITY ← `.autocode/agents/security.md` (or "None")
@@ -48,7 +50,7 @@ MEMORY_QA ← `.autocode/agents/qa.md` (or "None")
 PROJECT_PHILOSOPHY ← `~/.claude/autocode/philosophy.md` (warn if missing)
 
 **Step 0.4 — Escalation pre-check:**
-If CURRENT_CYCLE > 5: trigger ESCALATION (reason: CYCLE_LIMIT_EXCEEDED).
+If AUDIT_CYCLE > 5: trigger ESCALATION (reason: CYCLE_LIMIT_EXCEEDED). Note: WC_CYCLE is not counted here — WorldClass quality loops are uncapped.
 If any finding in CYCLE_HISTORY is annotated "ESCALATE": trigger ESCALATION (reason: REPEATED_FINDING).
 If severity trended UP in 3 consecutive prior cycles: trigger ESCALATION (reason: SEVERITY_ESCALATING).
 If "New findings introduced" > "Fixed this cycle" for 2 consecutive prior cycles: trigger ESCALATION (reason: REGRESSION_PATTERN).
@@ -308,7 +310,7 @@ If WORLDCLASS_RESULT.verdict = "MAX_CYCLES":
 
   **Step 3.3 — Write cycle log entry:**
   Append to `.autocode/agents/cto.md` `## Task Cycle Log` under Task #[TASK_NUM]:
-    `#### Cycle [CURRENT_CYCLE] — [today's date] — WorldClass MAX_CYCLES`
+    `#### WC Cycle [WC_CYCLE + 1] — [today's date] — WorldClass MAX_CYCLES`
     `Build approach: WorldClass remediation — [top deduction category] was the blocking gap`
     `Scripts: PASS (audit passed; WorldClass did not reach 95)`
     `WorldClass score: [COMBINED_SCORE]/100 | Gap: [95 - COMBINED_SCORE] pts`
@@ -317,10 +319,10 @@ If WORLDCLASS_RESULT.verdict = "MAX_CYCLES":
     `New findings introduced: — | Regression signal: NO`
     `CTO diagnosis run: NO — WorldClass quality gap, not a repeated audit finding`
 
-  **Step 3.4 — Increment and check escalation:**
-  Increment CURRENT_CYCLE.
-  If CURRENT_CYCLE > 5: trigger ESCALATION (reason: CYCLE_LIMIT_EXCEEDED — include WorldClass deductions in escalation brief).
-  Otherwise: return to Phase 1 Step 1.1. The build agent receives the WorldClass deductions via CYCLE_HISTORY and must fix them before the audit re-runs.
+  **Step 3.4 — Increment WC_CYCLE and return:**
+  Increment WC_CYCLE. Do NOT increment AUDIT_CYCLE — WorldClass loops are uncapped.
+  Return to Phase 1 Step 1.1. The build agent receives the WorldClass deductions via CYCLE_HISTORY and must fix them before the audit re-runs.
+  There is no escalation trigger for WC_CYCLE. WorldClass runs until it passes.
 
 ---
 
