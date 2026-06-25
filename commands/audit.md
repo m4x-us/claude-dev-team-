@@ -542,7 +542,24 @@ AUDIT_RESULT_FINAL: {"verdict":"FAIL","findings":[...FINDINGS_JSON array verbati
 ```
 
 If `MODE = "orchestrated"`: stop here. /task handles the fix cycle and retry.
-If `MODE = "standalone"`: print the findings list and stop. Max handles next steps.
+If `MODE = "standalone"`:
+  Print the findings list.
+  If $ARGUMENTS contains a task number (matches `#\d+` or a bare integer):
+    Extract TASK_NUM (e.g. "#001" → 1 → zero-padded to match tasks.md format).
+    Print:
+    ```
+    ─────────────────────────────────────────────────────────────
+      Found [findings_count] issues ([critical] critical, [major] major, [minor] minor).
+      Send to the dev team to fix?
+
+        yes → /task #[TASK_NUM] starts a fix cycle now
+        no  → stop here, review findings above first
+    ─────────────────────────────────────────────────────────────
+    ```
+    Wait for user input.
+    If yes: run `/task #[TASK_NUM]`. Stop.
+    If no: stop.
+  If no task number detected in $ARGUMENTS: stop.
 
 **If verdict = PASS:**
 Append to `.autocode/trends.md`:
