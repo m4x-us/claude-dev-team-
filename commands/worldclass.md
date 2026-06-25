@@ -2,7 +2,7 @@
 
 You are running a world-class quality check. The task is: $ARGUMENTS
 
-This command scores the code on two independent lenses (Architecture + Vibes), shows exactly where points are lost, and loops through remediation until the combined score reaches 95/100 or 3 cycles are exhausted.
+This command scores the code on two independent lenses (Architecture + Vibes), shows exactly where points are lost, and loops through remediation until the combined score reaches 95/100 or 5 cycles are exhausted.
 
 ---
 
@@ -355,18 +355,18 @@ Combined: [COMBINED_SCORE]/100 — AC FAIL: [not_met] not met, [partial] partial
 ```
 Trigger the Remediation Plan Loop. Pass unmet/partial AC items as `UNMET_ACCEPTANCE_CRITERIA` to the plan agents.
 
-**If COMBINED_SCORE < 95 AND fewer than 3 cycles have run:**
+**If COMBINED_SCORE < 95 AND fewer than 5 cycles have run:**
 
 Print how many points need to close and which deductions account for the largest gap. Include any AC failures in the gap summary. Then trigger the Remediation Plan Loop below.
 
-**If 3 cycles have been reached without hitting 95:**
+**If 5 cycles have been reached without hitting 95:**
 
 Append to `.autocode/worldclass-trends.md`:
 ```
-| [today's date] | [first 60 chars of $ARGUMENTS] | 3 | [COMBINED_SCORE] | MAX_CYCLES |
+| [today's date] | [first 60 chars of $ARGUMENTS] | 5 | [COMBINED_SCORE] | MAX_CYCLES |
 ```
 
-WORLDCLASS_RESULT: {"score":[COMBINED_SCORE],"verdict":"MAX_CYCLES","cycles_run":3}
+WORLDCLASS_RESULT: {"score":[COMBINED_SCORE],"verdict":"MAX_CYCLES","cycles_run":5}
 
 **Write escalation brief to CTO memory:**
 
