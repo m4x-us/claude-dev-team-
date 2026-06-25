@@ -579,8 +579,42 @@ Outstanding issues:
 [list them]
 ```
 
-If `MODE = "standalone"`: run `/reflect $ARGUMENTS`. Stop.
+If `MODE = "standalone"`: run `/reflect $ARGUMENTS`. Then proceed to POST-AUDIT REORDER below.
 If `MODE = "orchestrated"`: stop here. /task handles escalation.
+
+---
+
+## POST-AUDIT: Task List Reorder (standalone mode only)
+
+After every standalone audit — regardless of verdict — the CTO re-evaluates the task order now that new findings are known.
+
+Read all non-COMPLETE tasks from `.autocode/tasks.md`.
+
+Apply the same priority logic as Step 4.4 in `/task`:
+
+**Elevation triggers** (move task to an earlier batch):
+- A finding from this audit directly implicates the file or module a task addresses → move that task up
+- Any finding with severity ≥ 7 in a category (security, error-handling) → elevate tasks of that same category
+- A finding is marked ESCALATE → elevate all tasks touching that file
+
+**Demotion triggers** (move task to a later batch):
+- A module the audit found completely clean → tasks touching only that module can move later
+- Task has severity ≤ 3, blocks nothing, and no audit finding implicates it → move later
+
+**Hard constraint:** Never move a task before any task it is "Blocked by."
+
+Update `.autocode/tasks.md` if any tasks moved. Add a one-line note on each moved task:
+`**Moved:** Batch [from] → Batch [to] — [finding that triggered the move] — [today's date]`
+
+Print only if something moved:
+```
+─────────────────────────────────────────────────────────────
+  PRIORITY REORDER — [N] task(s) moved after audit
+  Task #NNN: Batch X → Batch Y — [reason]
+─────────────────────────────────────────────────────────────
+```
+
+If nothing moved: silent.
 
 ---
 
