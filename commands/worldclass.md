@@ -306,7 +306,7 @@ After printing the scorecard, log every deduction with severity ≥ 4 from both 
 
 ```
 ## [today's date] | Task: $ARGUMENTS — WorldClass cycle [N]
-- [category] [description of deduction] — severity [N] (worldclass: -[N] pts)
+- [category] [description of deduction] — severity [N] | worldclass: -[N] pts | WORLDCLASS
 ```
 
 Architecture deductions use the category the agent tagged. Vibes deductions use the category the agent tagged (usually `code-quality`). If `.autocode/patterns.md` does not exist, create it with `# AutoCode Patterns Log` header first.
