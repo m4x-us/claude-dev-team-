@@ -265,6 +265,36 @@ EXTERNAL INTEGRATIONS (if this task touches webhooks, external APIs, or Twilio/G
 
 Capture Agent S's findings.
 
+**Agent M — Mutation Gate:**
+
+From FULL_DIFF, identify any changed files that belong to a Stryker-covered package:
+
+| If FULL_DIFF contains path starting with... | Run filter |
+|---|---|
+| `packages/ordinatio-auth/` | `@ordinatio/auth` |
+| `packages/ordinatio-email/` | `@ordinatio/email` |
+| `packages/ordinatio-security/` | `@ordinatio/security` |
+| `packages/ordinatio-cms/` | `@ordinatio/cms` |
+
+For each matched package, run from the project root (where `.autocode/` lives):
+```bash
+timeout 120 pnpm --filter [filter-name] run mutation:ci 2>&1
+MUTATION_EXIT=$?
+```
+
+Interpret exit code:
+- Exit 0: score ≥ break threshold → no finding for this package
+- Exit 1: score < break threshold → read `packages/[path]/.stryker-tmp/reports/mutation.json`:
+  - Compute score: `killed / (killed + survived + timeout + noCoverage) * 100` (round to 2 decimal places)
+  - Read `thresholds.break`
+  - Count entries where `status == "Survived"`
+  - Create finding (id: M001, M002...): `{"id":"M001","severity":7,"category":"tests","file":"packages/[path]/","function":"mutation-gate","line":0,"description":"Mutation score for [filter-name] is [score]% — below break threshold of [break]%. [N] surviving mutants. Tests would not catch [N] classes of bugs introduced by this diff.","annotation":"NEW"}`
+- Any other exit / timeout: print `MUTATION GATE WARNING: [filter-name] mutation:ci failed or timed out — skipping` → no finding for this package
+
+If no covered packages in diff: print `MUTATION GATE: SKIPPED — no Stryker-covered packages in this diff.`
+
+Collect all mutation findings as FINDINGS_M (IDs: M001, M002... — may be []).
+
 **Spawn Red Agent R — Adversarial Reviewer (unprimed, diff-only):**
 
 Red Agent R receives NO philosophy, NO cycle history, NO caller context. Priming is
@@ -299,24 +329,47 @@ DECAY: What does this exact change make worse over time?
 - Does this create a hidden coupling that will surprise the next developer?
 For each: state the exact file:function:line and the long-term cost.
 
-Output format — one line per finding, no hedging:
-FINDING: [ATTACKER|CHAOS|DECAY] | [file:function:line] | [precise description — no 'appears to', 'likely', 'may', 'should']
+CONTRACT: Does this change introduce any lies in the code?
+- Functions whose names do not fully describe what they do — including side effects not reflected in the name
+- Return types that omit null, undefined, or error where the function can actually return them
+- State variables that can hold a value their name does not describe
+- Parameters named or typed as one thing that silently accept something materially different
+
+A CONTRACT finding must name the specific promise vs. the specific reality.
+GOOD: "validateSession return type is Session but function returns null when token is expired — callers get null with no type warning"
+FORBIDDEN: "function could have a clearer name" — too vague, not a CONTRACT finding
+
+Output format — one line per finding, include urgency before location:
+FINDING: [ATTACKER|CHAOS|DECAY|CONTRACT] | [CRITICAL|HIGH|MEDIUM|LOW] | [file:function:line] | [precise description — no 'appears to', 'likely', 'may', 'should']
+
+Urgency definitions:
+- CRITICAL: exploitable now, data loss, auth bypass, or silent corruption
+- HIGH: real failure under plausible production conditions
+- MEDIUM: fragile, misleading, or will cause a bug eventually
+- LOW: technical debt, minor naming inaccuracy, low-risk coupling
 
 If you find nothing in a lens:
-FINDING: [LENS] | NONE | no issues found in this lens"
+FINDING: [LENS] | NONE | NONE | no issues found in this lens"
 
 **Convert Red Agent R output to FINDINGS_JSON (FINDINGS_R):**
-Parse each `FINDING:` line from R's output. For each non-NONE line:
+Parse each `FINDING:` line from R's output. New format is 4 pipe-segments:
+  `FINDING: [LENS] | [URGENCY] | [file:function:line] | [description]`
+
+Fallback (D6): If a line has only 3 segments (old format without urgency), treat as:
+  `FINDING: [LENS] | MEDIUM | [file:function:line] | [description]`
+
+For each non-NONE line:
 - Lens ATTACKER → category: "security"
 - Lens CHAOS → category: "error-handling"
 - Lens DECAY → category: "code-quality"
-- Severity: default 6 — this is a placeholder pending Agent C's final score
-- Extract the middle pipe-segment as file:function:line (split on `:`, last element is line number)
-- Set `severity_note`: "Red Agent R — unscored, pending Agent C"
+- Lens CONTRACT → category: "code-quality"
+- Urgency → severity: CRITICAL→9, HIGH→7, MEDIUM→5, LOW→3
+- Extract file:function:line from segment 3 (0-indexed), last colon-element is line number
+- Set `severity_note`: "Red Agent R — urgency:[URGENCY], pending Agent C re-score"
 - Set `annotation`: "NEW"
 
-Build FINDINGS_R as a FINDINGS_JSON-compatible array:
-[{"id":"R001","severity":6,"category":"[derived]","file":"[file]","function":"[fn]","line":N,"description":"[text]","annotation":"NEW","severity_note":"Red Agent R — unscored, pending Agent C"}]
+Build FINDINGS_R (IDs: R001, R002...):
+[{"id":"R001","severity":[from urgency],"category":"[derived]","file":"[file]","function":"[fn]","line":N,"description":"[text]","annotation":"NEW","severity_note":"Red Agent R — urgency:[URGENCY], pending Agent C re-score"}]
 
 If R output has all NONE lines: FINDINGS_R = [].
 
@@ -370,6 +423,9 @@ Security Auditor S findings:
 
 Red Adversarial Auditor R findings (unprimed — diff only, no philosophy or history):
 [FINDINGS_R]
+
+Mutation Gate findings (surviving mutants below break threshold — empty [] if gate passed or skipped):
+[FINDINGS_M]
 
 DONE_WHEN FINDING (if any — inject as severity-6 item):
 [DONE_WHEN_FINDING or 'None']
