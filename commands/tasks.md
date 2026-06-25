@@ -38,25 +38,26 @@ No task list found. Run /meet to generate one.
 
 Parse each `## Batch N` section and every `### Task #` entry within it. For each task extract: number, title (first line of description), Complexity field, Owner, Status.
 
-Print a formatted summary:
+Print a formatted table, grouped by batch:
 
 ```
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  TASK LIST
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+## Batch N — [theme]
 
-Batch N — [theme]
-  #NNN  [⚡ Direct / 🔧 Full / ❓ No label]  [title]
-        [owner] · [COMPLETE ✓ / open]
-  ...
+| # | Complexity | Title | Owner | Status |
+|---|-----------|-------|-------|--------|
+| #001 | ⚡ Direct | [title] | [owner] | ✓ Complete |
+| #002 | 🔧 Full   | [title] | [owner] | open |
+| #003 | ❓ No label | [title] | [owner] | open |
 
-Batch N+1 — [theme]
-  ...
+## Batch N+1 — [theme]
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  [total open] open  ·  [total complete] complete  ·  [total] total
-  [N] tasks missing Complexity label — run /task #N to classify
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+| # | Complexity | Title | Owner | Status |
+|---|-----------|-------|-------|--------|
+...
+
+---
+[total open] open · [total complete] complete · [total] total
+[N] tasks missing Complexity label — run /task #N to classify
 ```
 
 Icons: `⚡ Direct` = no full dev team needed. `🔧 Full` = full team. `❓ No label` = unclassified, will be evaluated at Step 0.0 when run.
