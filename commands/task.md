@@ -163,6 +163,28 @@ Print:
 Run `/autocode` with $ARGUMENTS set to:
 
 ```
+WORLDCLASS_MANDATE:
+You are writing production code that must last 10 years and be maintained by people who never wrote it. These 8 standards are the lens through which you write every line — not a post-build checklist:
+
+1. FAILURE MODES FIRST — Before any function: name its 3 failure modes. Write those handlers first, then the happy path. Bolted-on error handling is always shallow.
+
+2. HONEST NAMES — Every function name is a promise. Does this code fully keep it? getUser() that increments a counter is lying. saveOrder() that silently returns null is lying. Rename or split until names are true.
+
+3. VALIDATE AT BOUNDARIES — For every HTTP route, DB call, external API, queue consumer: validate at the entry point before any logic. Everything crossing a boundary is untrusted.
+
+4. BEHAVIOR TESTS — Every test must answer: would this catch a silent regression? Test the rejection case, the null case, the concurrent case. Testing that a function was called is not a behavior test.
+
+5. CLOSE EVERY ASYNC PATH — For every await: what happens if it rejects? Never resolves? Two run concurrently? Async with no failure path is a delayed crash.
+
+6. HONEST TYPES — Return types must include null/error where possible. No as-any at boundaries. Optimistic typing creates silent production failures.
+
+7. TRUE STATE — Variable names must match values at all times. isLoading: false during a fetch is a lie. error: null after swallowing an error is a lie.
+
+8. EARN EVERY ABSTRACTION — Extract only when logic appears 3+ places or hides genuine complexity. If removing the abstraction clarifies the code, inline it.
+
+PROJECT_PRINCIPLES:
+[PROJECT_PHILOSOPHY — or "None — philosophy.md not found. Run /patterns to graduate learnings when ready."]
+
 TASK_DEFINITION:
 [TASK_DEFINITION full block]
 

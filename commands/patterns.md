@@ -483,6 +483,67 @@ Print:
 
 ---
 
+**Step 4D — Universal Elevation Check:**
+
+Parse `~/.claude/autocode/philosophy.md` CHANGELOG table (section `## CHANGELOG`). Group rows by "Section Updated" column. Count rows per section.
+
+If no section has 3+ rows: print `No universal candidates yet — need 3+ independent graduations of the same category.` and skip this step.
+
+For each section with 3+ rows, spawn a single agent:
+
+"You are a senior software architect deciding whether a recurring project-level principle deserves promotion to a universal building standard that applies to all projects.
+
+Category that graduated independently 3+ times: [section name]
+Graduation count: [N]
+Graduation entries from philosophy.md CHANGELOG:
+[paste all rows for this section]
+
+Current worldclass-standard.md:
+[full contents of ~/.claude/commands/worldclass-standard.md]
+
+Does this category already have a principle in worldclass-standard.md?
+- If YES: is there a meaningful strengthening based on what caused 3+ independent graduations?
+- If NO: propose a new principle in the same voice and format as the existing 8.
+
+In either case, cite the evidence: what do the graduation entries reveal that makes this universal?
+
+Output:
+ACTION: ADD NEW / STRENGTHEN EXISTING / NO CHANGE NEEDED
+PRINCIPLE NUMBER: [next number if new, existing number if strengthening]
+TITLE: [principle title]
+RUBRIC CATEGORY: [the WorldClass deduction category this maps to]
+TEXT: [exact principle text to add or replace]
+EVIDENCE: [one sentence: why 3+ independent graduations proves universality]"
+
+Print in terminal:
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  UNIVERSAL CANDIDATE: [section name]
+  [N] independent graduations in philosophy.md
+  Action: [ADD NEW / STRENGTHEN / NO CHANGE]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  [TEXT]
+
+  Evidence: [EVIDENCE]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+Ask: "Elevate to worldclass-standard.md? (y/n)"
+
+If yes:
+1. Read `~/.claude/commands/worldclass-standard.md`
+2. Add new principle or strengthen existing (same voice, same format as the 8 founding principles)
+3. Update Provenance table: add row with "Elevated from philosophy.md" and graduation count
+4. Append to worldclass-standard.md `## CHANGELOG`: `| [today's date] | Principle [N]: [title] | [ADD NEW / STRENGTHEN EXISTING] | [N] independent graduations in philosophy.md |`
+5. Write updated file
+6. Print: "✅ Elevated to WorldClass Standard. Build agents will adopt this on the next cycle."
+
+If no: print "Skipped."
+
+Present each candidate one at a time. If none qualify: already printed above.
+
+---
+
 ## RULES
 
 - Never fabricate data — only use what is in the log files
