@@ -373,7 +373,7 @@ Finding questions should surface:
 - Strategic direction (does Max's answer change the batch ordering?)
 - Product gaps (does the product agent finding match Max's understanding of what's built?)
 
-Produce exactly 5 questions total: B1, B2, Q1, Q2, Q3. Number them 1–5."
+Produce exactly 7 questions total: B1, B2, Q1, Q2, Q3, Q4, Q5. Number them 1–7."
 
 Capture the synthesis agent's output as `SYNTHESIS_QUESTIONS`.
 
