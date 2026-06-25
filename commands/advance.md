@@ -20,9 +20,11 @@ If STREAM_ID is not set: you are the parent CTO. Continue below.
 
 ## Phase 1: Dependency Analysis
 
-Read `.autocode/tasks.md`. Collect every open task (no `Status: COMPLETE` line).
+Read `.autocode/tasks.md`. Find the batch section marked `[CURRENT SPRINT]`. Collect only the open tasks (no `Status: COMPLETE` line) from that batch. Do not touch tasks in any other batch.
 
-For each open task, extract:
+If no batch is marked `[CURRENT SPRINT]`: print "No current sprint batch found in tasks.md. Run /meet or /tasks to set one." Stop.
+
+For each open task in the current sprint batch, extract:
 - `**File:**` — normalize to filename(s) only (strip `:line` suffix). If "Multiple — see What," extract all filenames from the `**What:**` description.
 - `**Blocked by:**` — list of Task numbers. "Nothing" → empty list.
 - `**Complexity:**` — Direct or Full.
@@ -52,7 +54,7 @@ Print:
 
 ```
 ╔═══════════════════════════════════════════════════════════════╗
-║  ADVANCE PLAN — [N] streams · [N] parallel tasks             ║
+║  ADVANCE PLAN — Batch [N] · [N] streams · [N] tasks          ║
 ║                                                               ║
 ║  Stream A — [N Direct / N Full] · exec order: #N → #N → #N  ║
 ║    Tasks: #001, #003, #007                                    ║
@@ -266,6 +268,7 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 - Never spawn child CTOs without Max approving the stream plan first (MAX GATE 1)
 - Never launch streams without Max having the option to inspect briefs (MAX GATE 2)
 - Never commit without Max approving the final consolidated state (MAX GATE 3)
+- Never touch tasks outside the current sprint batch — /advance is scoped to one batch only
 - Never put tasks with shared files in different streams — verify mechanically in Phase 1
 - Never declare a sequential queue empty without explicitly checking for cross-stream dependencies
 - Stream rationale is not optional — every stream must have one sentence explaining domain coherence
