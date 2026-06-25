@@ -25,28 +25,16 @@ If `STREAM_ID` is not set: use the standard paths as written throughout this fil
 **Step 0.0 — Complexity check:**
 Read `.autocode/tasks.md`. Find Task #TASK_NUM. Check for a `**Complexity: Direct**` line.
 
-If found:
-─────────────────────────────────────────────────────────────
-  ⚡ Task #[TASK_NUM] is tagged DIRECT complexity.
-  This was evaluated as a cosmetic or single-line fix when it
-  was added to the task list. The full dev team (audit, worldclass,
-  4 agents) will take 10× longer than handling it directly.
-
-  Recommended: open a regular Claude session and fix it there.
-
-  Continue with the full dev team anyway?  yes / no
-─────────────────────────────────────────────────────────────
-Wait for user input. If no: stop. If yes: proceed to Step 0.1.
-
-If Complexity: Full: proceed to Step 0.1 silently.
+If `**Complexity: Direct**` found: set TASK_PATH = DIRECT. Print: "Direct task — Builder path." Proceed to Step 0.0b.
+If `**Complexity: Full**` found: set TASK_PATH = FULL. Proceed to Step 0.0b silently.
 
 If no Complexity field:
   Run COMPLEXITY_EVAL on the task description:
   DIRECT if ALL: (a) ≤ 20 words, (b) contains a cosmetic keyword (typo/comment/rename/update text/fix label/add log/remove unused/clarify/whitespace/formatting), (c) contains none of: auth/security/database/migration/schema/api route/endpoint/feature flag/implement/integrate/webhook/redis/queue/worker/payment/order/multi-file.
   FULL otherwise (default when in doubt).
   Write `**Complexity: [Direct/Full]**` to the task entry in `.autocode/tasks.md` before the `**Owner:**` line.
-  If Direct: show the warning above and wait for yes/no input.
-  If Full: proceed to Step 0.1 silently.
+  If Direct: set TASK_PATH = DIRECT. Print: "Direct task — Builder path." Proceed to Step 0.0b.
+  If Full: set TASK_PATH = FULL. Proceed to Step 0.0b silently.
 
 **Step 0.0b — Debt review:**
 
@@ -80,6 +68,133 @@ Wait for input.
 - If no: proceed silently.
 
 If no matching Direct entries: skip silently.
+
+**TASK_PATH branch:**
+If TASK_PATH = DIRECT → skip Steps 0.1–4.2. Proceed to **DIRECT TASK PATH** section below.
+If TASK_PATH = FULL → continue to Step 0.1.
+
+---
+
+## DIRECT TASK PATH
+
+The Builder implements. The CTO verifies and closes. No audit. No WorldClass. No carry-forward.
+
+**Step D.1 — Read task definition:**
+Read `.autocode/tasks.md`. Find Task #TASK_NUM. Extract TASK_DEFINITION, DONE_WHEN, TASK_FILES. If Status: COMPLETE: stop.
+
+**Step D.2 — Read cycle log and memories:**
+Read CYCLE_HISTORY from `.autocode/agents/cto.md` `## Task Cycle Log` for Task #TASK_NUM (or "None — first cycle").
+Set AUDIT_CYCLE = 1 (resets per session).
+Read MEMORY_SECURITY, MEMORY_ARCHITECT, MEMORY_QA, PROJECT_PHILOSOPHY (same as Steps 0.2–0.3).
+
+**Step D.3 — Escalation pre-check (cap: 3 cycles):**
+If AUDIT_CYCLE > 3: trigger DIRECT_ESCALATION. A Direct task needing more than 3 attempts is not actually Direct.
+If any finding in CYCLE_HISTORY annotated "ESCALATE": trigger DIRECT_ESCALATION.
+Otherwise proceed to Step D.4.
+
+**Step D.4 — Pre-build scope check (Gate 1):**
+Before calling the Builder, verify ALL of the following:
+1. Task description contains NONE of: "refactor", "redesign", "migrate", "implement", "integrate", "rewrite", "across the codebase", "multiple files"
+2. Done-when condition references only files in TASK_FILES or test names/commands — not a different file
+3. TASK_FILES is a single file (or "Multiple — see What" where What is clearly bounded to cosmetic changes)
+
+If ANY check fails:
+- Print: "Task #[TASK_NUM] has scope-expanding language or a multi-file done-when. Re-classifying as Full."
+- Edit `.autocode/tasks.md`: replace `**Complexity: Direct**` with `**Complexity: Full**`.
+- Set TASK_PATH = FULL. Continue from Step 0.1 on the Full path.
+
+If all checks pass: proceed to Step D.5.
+
+**Step D.5 — Build (Gate 2 embedded):**
+Call `/autocode` with the same context assembled in Step 1.1 PLUS this block at the very top:
+```
+DIRECT_TASK_MODE: ON
+This is a Direct-complexity task. Implementation must touch only the file(s) in TASK_FILES.
+If you discover that a correct fix requires touching files outside TASK_FILES, or that the
+root cause is architectural (cannot be fixed in-place), output the following BEFORE your
+implementation plan:
+  SCOPE_ESCALATION: YES
+  SCOPE_REASON: [specific description of what you found]
+If no scope issue: do not include these lines. Implement directly.
+```
+
+**Step D.6 — Read BUILD_RESULT and check scope signal (Gate 2):**
+
+Check for scope escalation first:
+- If BUILD_RESULT contains `SCOPE_ESCALATION: YES`:
+  - Print: "Builder detected scope expansion: [SCOPE_REASON]. Converting Task #[TASK_NUM] from Direct to Full."
+  - Edit `.autocode/tasks.md`: replace `**Complexity: Direct**` with `**Complexity: Full**`.
+  - Set TASK_PATH = FULL. Continue from Step 0.5 on the Full path (Builder's work becomes Cycle 1).
+
+Then check build status:
+- If BUILD_RESULT.status = FAIL:
+  - Append abbreviated cycle log entry to `.autocode/agents/cto.md` (see format at Step D.8).
+  - Increment AUDIT_CYCLE. If > 3: trigger DIRECT_ESCALATION.
+  - Return to Step D.5.
+- If BUILD_RESULT.status = PASS: proceed to Step D.7.
+
+**Step D.7 — Done-when verification:**
+Run DONE_WHEN mechanically:
+- grep command → run it, check exit code
+- test name → run test
+- file state → check file
+- UI behavior that cannot be verified in terminal → mark DEFERRED
+
+If DONE_WHEN FAILS: treat as failed build. Return to Step D.5 with failure noted in context.
+If DONE_WHEN PASSES or DEFERRED: proceed to Step D.8.
+
+**Step D.8 — Close:**
+
+Append to `.autocode/agents/cto.md` `## Task Cycle Log`:
+```
+### Task #[TASK_NUM] | [first line of task description] | Status: COMPLETE | Cycle [AUDIT_CYCLE] | Completed: [today's date]
+
+#### Cycle [AUDIT_CYCLE] — [today's date] — Direct Task (Builder path)
+Build approach: [specific file:function:line — must be specific, never vague]
+Scripts: PASS
+Complexity path: Direct — no audit, no WorldClass
+Done-when: [PASS / DEFERRED]
+Fixed this cycle: — | Still open: — | New findings: — | Regression signal: NO
+CTO diagnosis run: NO — Direct task
+```
+
+Ask Max:
+> "Direct task #[TASK_NUM] complete. Done-when: [PASS/DEFERRED]. Mark done? yes/no"
+
+If no: stop. Task remains open.
+
+If yes:
+- Edit `.autocode/tasks.md`: add `**Status: COMPLETE — [today's date]**` below `**Owner:**` line.
+- Proceed to Step 4.3 (batch completion survey).
+- Proceed to Step 4.4 (post-completion triage).
+- Proceed to Step 4.5 (start next task).
+
+No carry-forward gate. No patterns graduation. No /reflect call. No agent memory writes.
+
+---
+
+**DIRECT_ESCALATION:**
+
+Print:
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  DIRECT ESCALATION — Task #[TASK_NUM]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  A Direct task that needs more than 3 attempts is not actually Direct.
+  Cycles run: [AUDIT_CYCLE] | Last failure: [summary from BUILD_RESULT]
+
+  Options:
+    [A] Convert to Full task — run full /task cycle with audit + WorldClass
+    [B] Accept current state and close as-is
+    [C] Abort — leave task open for manual review
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+Wait for Max input.
+- A → Edit `.autocode/tasks.md`: Complexity: Direct → Full. Continue from Step 0.5 on Full path.
+- B → Write COMPLETE status to tasks.md. Run Steps 4.3–4.5.
+- C → Stop. Task stays open.
+
+---
 
 **Step 0.1 — Read task definition:**
 Read `.autocode/tasks.md`. Find Task #TASK_NUM.
