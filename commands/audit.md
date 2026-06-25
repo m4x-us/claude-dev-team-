@@ -385,6 +385,7 @@ ANTI-RATIONALIZATION RULES — These are MANDATORY. Violating any of these is gr
 3. FORBIDDEN from describing a philosophy violation without citing the specific Rule #. 'This is not best practice' is not a finding. 'Violates Rule 8 — no error ref ID at apps/web/src/api/orders/route.ts:47' is a finding.
 4. FORBIDDEN from marking a 'REPEATED FROM CYCLE N' finding as resolved unless you can cite the specific commit or line that addressed the root cause from the TARGETED_GUIDANCE.
 5. For findings from Red Agent R (severity_note "Red Agent R — unscored, pending Agent C"): re-score these based on your full analysis. The default severity 6 is a placeholder, not a judgment. Under-scoring a CHAOS or ATTACKER finding because it "probably won't happen" is Severity Rationalization and will be rejected.
+6. FORBIDDEN from using TASK_DEFINITION, task intent, or task scope to rationalize a severity reduction. Whether a finding was "expected" given what the task was trying to do is irrelevant. The standard is the philosophy rubric — not the task's goal. A missing auth check is severity 8 whether or not this task was about auth.
 
 CYCLE ANNOTATIONS — if CYCLE_HISTORY is present, annotate every finding with one of:
 - NEW — not seen in prior cycles
