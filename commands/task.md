@@ -7,6 +7,19 @@ Execute every phase without pausing.
 
 ---
 
+## STREAM_ID check (parallel /advance sessions only)
+
+If `STREAM_ID` is set in the current context (set by a parent CTO via `/advance` brief):
+- Replace `.autocode/tasks.md` with `.autocode/stream-[STREAM_ID]/tasks.md` for all reads/writes
+- Replace `.autocode/debt.md` with `.autocode/stream-[STREAM_ID]/debt.md` for all reads/writes
+- Replace `.autocode/carry-forward-log.md` with `.autocode/stream-[STREAM_ID]/carry-forward-log.md` for all reads/writes
+- Create these files with their standard headers if they do not exist
+- No other behavior changes — all phases proceed normally
+
+If `STREAM_ID` is not set: use the standard paths as written throughout this file.
+
+---
+
 ## PHASE 0: CTO CONTEXT
 
 **Step 0.0 — Complexity check:**
