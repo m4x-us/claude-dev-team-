@@ -1,347 +1,319 @@
-# Patterns — Audit Pattern Analysis
+# Patterns — Health Report Generator
 
-Read `.autocode/patterns.md` in the current project and analyze recurring findings to suggest improvements to the plan prompts.
-
----
-
-## STEP 1: READ THE DATA
-
-Read `.autocode/patterns.md`. If it doesn't exist or is empty, print:
-"No pattern data yet. Run /autocode on a few tasks first."
-Then stop.
+Read `.autocode/patterns.md` in the current project, analyze recurring findings, and generate a visual HTML health report. Then run the interactive philosophy graduation steps in the terminal.
 
 ---
 
-## STEP 2: PRINT THE RAW DATA
+## PHASE 0: READ ALL DATA (silent — do not print yet)
 
-Print the full contents of `.autocode/patterns.md` so the user can see everything that has been logged.
+Read `.autocode/patterns.md` → `PATTERNS_RAW`. If it doesn't exist or is empty: print "No pattern data yet. Run /task on a few tasks first." Stop.
 
----
-
-## STEP 3: ANALYZE PATTERNS
-
-Group all findings by category. For each category, count:
-- How many times it appeared
-- Which tasks it appeared in
-- The severity range (lowest to highest)
-
-Print a summary table like this:
-
-```
-PATTERN SUMMARY
-───────────────────────────────────────────────────────
-Category          | Occurrences | Tasks                | Severity Range
-error-handling    | 6           | #103, #104, #106     | 5–8
-tests             | 4           | #103, #105, #106     | 5–7
-auth              | 2           | #104, #107           | 8–8
-───────────────────────────────────────────────────────
-```
-
-Highlight any category that has appeared in 3 or more tasks — these are systemic patterns, not one-off mistakes.
+Read `.autocode/trends.md` → `TRENDS_RAW` (or "None").
+Read `.autocode/worldclass-trends.md` → `WORLDCLASS_RAW` (or "None").
+Read `.autocode/reflections.md` → `REFLECTIONS_RAW` (or "None").
 
 ---
 
-## STEP 4: INTELLIGENT RECOMMENDATIONS
+## PHASE 1: ANALYZE (silent — build all variables before generating HTML)
 
-For each systemic pattern (3+ occurrences), produce a specific recommendation:
+**1A — Parse patterns.md:**
 
-1. **Explain the pattern** — what keeps going wrong and why it likely keeps happening
-2. **Suggest specific language** to add to the initial plan prompt that would catch this before code gets written
-3. **Suggest a checklist item** Agent 4 (the final revision) should always verify before accepting the plan
+Parse every bullet line matching: `^-\s+(\S+)\s+(.+)—\s+severity\s+(\d+)\s*\|`
+Group by category. For each category compute:
+- `occurrences` — count of matching lines
+- `tasks` — unique task identifiers extracted from the `## [date] | Task: [...]` header above each bullet
+- `avg_severity` — mean of all severity values in that category
+- `max_severity` — highest severity seen
+- `last_seen_task` — task identifier from the most recent entry
 
-Format each recommendation like this:
+Systemic patterns = categories where `occurrences >= 3` AND the entries span `>= 2` different tasks.
 
-```
-PATTERN: error-handling (6 occurrences across #103, #104, #106)
-─────────────────────────────────────────────────────────────────
-What keeps going wrong:
-[explanation]
+**1B — Parse trends.md:**
 
-Suggested addition to the Initial Plan prompt:
-"[specific language to add]"
+Parse each data row (skip header). Extract: date, task (first 40 chars), cycles, final_severity, verdict (PASS / FAIL / MAX_CYCLES).
+- `pass_rate` = PASS count / total × 100 (round to 1 decimal)
+- `avg_severity_recent` = mean of last 5 final_severity values
+- `trend_direction` = compare avg of last 3 vs prior 3 (need 6+ rows): IMPROVING / STABLE / DEGRADING / "Not enough data"
+- `audit_rows` = array of {date, task, cycles, severity, verdict} for chart
 
-Suggested checklist item for Revision 3:
-"[specific verification question]"
-```
+**1C — Parse worldclass-trends.md:**
 
-Be specific. Vague recommendations like "handle errors better" are not useful.
-Good recommendations name the exact scenario, function type, or pattern that keeps failing.
+Parse each data row. Extract: date, task, cycles, score, verdict.
+- `avg_score_recent` = mean of last 5 scores (PASS rows only)
+- `wc_trend_direction` = compare avg of last 3 vs prior 3 PASS rows: IMPROVING / STABLE / DEGRADING / "Not enough data"
+- `wc_rows` = array of {date, task, score, verdict} for chart
 
----
+**1D — Plain English translations:**
 
-## STEP 5: OVERALL HEALTH SCORE
+Use this mapping for every category name displayed to the user:
+- `error-handling` → "Error Protection"
+- `tests` → "Test Quality"
+- `auth` → "Access Control"
+- `security` → "Security"
+- `data-loss` → "Data Safety"
+- `feature-flag` → "Feature Switches"
+- `async` → "Background Tasks"
+- `edge-case` → "Edge Cases"
+- `code-quality` → "Code Organization"
+- `performance` → "Speed & Efficiency"
+- `requirements` → "Feature Completeness"
+- `documentation` → "Documentation"
+- Any unmapped category → title-case the raw name
 
-Print a simple health score based on the data:
+Business impact per category (one sentence, non-technical):
+- `error-handling` → "The app may crash silently or show confusing error messages to customers."
+- `tests` → "Bugs may go undetected until customers find them in production."
+- `auth` → "The wrong users may be able to access data they shouldn't see."
+- `security` → "The system may be exposed to outside attacks or data breaches."
+- `data-loss` → "Customer data could be permanently lost or corrupted."
+- `feature-flag` → "New features may not be safely controllable after launch."
+- `async` → "Background tasks may fail silently or complete in the wrong order."
+- `edge-case` → "The app may behave unexpectedly in unusual but real situations."
+- `code-quality` → "The codebase becomes harder and slower to change over time."
+- `performance` → "The app may become slow or unresponsive as usage grows."
+- `requirements` → "Finished features may not fully match what was originally requested."
+- `documentation` → "The team loses context and makes avoidable mistakes on existing code."
 
-- 0–2 systemic patterns: 🟢 Healthy — your plan prompts are catching most issues
-- 3–4 systemic patterns: 🟡 Needs attention — refine your prompts in the areas above
-- 5+ systemic patterns: 🔴 Significant drift — your plan prompts need a major revision
+Severity badge (based on `avg_severity`):
+- 1.0–3.4 → label: "Low Priority", color: #3b82f6
+- 3.5–5.4 → label: "Worth Fixing", color: #f59e0b
+- 5.5–6.9 → label: "Fix Soon", color: #f97316
+- 7.0–8.4 → label: "Fix Now", color: #ef4444
+- 8.5–10 → label: "Critical", color: #7f1d1d
 
----
+Overall health (based on systemic pattern count):
+- 0–2 → "HEALTHY", color: #22c55e, emoji: ✅
+- 3–4 → "NEEDS ATTENTION", color: #f59e0b, emoji: ⚠️
+- 5+ → "SIGNIFICANT DRIFT", color: #ef4444, emoji: 🔴
 
-## STEP 6: ARCHIVE COMPARISON (if archives exist)
+**1E — Executive summary bullets (3 sentences, plain English, no jargon):**
 
-Check if any `.autocode/patterns-archive-*.md` files exist.
-
-If they do, scan them for categories that also appear in the current batch. For each match, print:
-
-```
-⚠️ RECURRING PATTERN: error-handling
-   Also appeared in: patterns-archive-2026-06-23.md
-   This pattern survived a prompt update — needs stronger guardrails.
-```
-
-This tells you immediately if a fix you made after the last batch didn't actually hold.
-
-If no archives exist, skip this step.
-
----
-
-## STEP 7: SEVERITY TREND ANALYSIS
-
-**Audit severity (trends.md):**
-
-Read `.autocode/trends.md`. If it doesn't exist or has fewer than 3 data rows, print:
-"Not enough audit trend data yet. Need at least 3 completed runs."
-Then skip the audit trend section.
-
-If it has 3 or more rows:
-
-1. Print the last 10 rows of the trends table so individual data points are visible — do not hide them behind averages.
-
-2. Flag any run with Final Severity ≥ 7:
-```
-⚠️ High-severity outlier: [date] — [task] — severity [N]
-```
-
-3. For trend direction — requires 6+ rows. Compare average severity of the most recent 3 runs vs the 3 before that:
-   - If fewer than 6 rows: print "Need 6+ runs for trend direction. Showing individual data points above."
-   - If recent 3 avg is lower by >0.5: IMPROVING 🟢 — severity is trending down
-   - If recent 3 avg is higher by >0.5: DEGRADING 🔴 — severity is trending up. Cross-reference with pattern summary above.
-   - Otherwise: STABLE 🟡 — no significant change
-
-Print the verdict clearly:
-```
-AUDIT TREND: IMPROVING / STABLE / DEGRADING
-Recent 3 avg: X.X | Prior 3 avg: X.X
-```
-
-**WorldClass scores (worldclass-trends.md):**
-
-Read `.autocode/worldclass-trends.md`. If it doesn't exist or has fewer than 3 data rows, print:
-"Not enough WorldClass data yet. Need at least 3 completed runs."
-Then skip the worldclass trend section.
-
-If it has 3 or more rows:
-
-1. Print the last 10 rows of the worldclass trends table.
-
-2. Flag any run with Final Score ≤ 80:
-```
-⚠️ Low-quality outlier: [date] — [task] — score [N]/100
-```
-
-3. For trend direction — requires 6+ rows. Compare average score of the most recent 3 runs vs the 3 before that. For worldclass, higher is better (opposite of audit severity):
-   - If fewer than 6 rows: print "Need 6+ runs for trend direction. Showing individual data points above."
-   - If recent 3 avg is higher by >2: IMPROVING 🟢 — quality is trending up
-   - If recent 3 avg is lower by >2: DEGRADING 🔴 — quality is trending down
-   - Otherwise: STABLE 🟡 — no significant change
-
-Print the verdict clearly:
-```
-WORLDCLASS TREND: IMPROVING / STABLE / DEGRADING
-Recent 3 avg: X.X | Prior 3 avg: X.X
-```
+Compose from the data:
+1. Pass rate sentence: "Your dev team has passed [pass_rate]% of recent audits" — or if no data "No audit history yet."
+2. Most recurring issue: "The most common issue is [plain English category] — it has appeared [N] times across [N] tasks." — or "No recurring issues yet."
+3. Trend sentence: "Quality is [IMPROVING → getting better / STABLE → holding steady / DEGRADING → getting worse]." Combine both audit and worldclass trends. If not enough data: "Not enough history yet to show a trend."
 
 ---
 
-## STEP 8: ARCHIVE PROMPT
+## PHASE 2: GENERATE HTML REPORT
 
-After printing everything, ask:
+Create directory: `mkdir -p .autocode/reports`
 
-"Archive this batch and start fresh? (y/n)"
+Generate a complete self-contained HTML file and write it to `.autocode/reports/patterns-[today's date].html`.
 
-**If yes:**
-1. Rename `.autocode/patterns.md` to `.autocode/patterns-archive-[today's date].md`
-2. Create a fresh empty `.autocode/patterns.md` with just the header:
-   ```
-   # AutoCode Patterns Log
-   ```
-3. Print: "✅ Batch archived to patterns-archive-[date].md. Starting fresh."
+The file must be entirely self-contained — no external file dependencies except CDN links (Chart.js and Google Fonts, both loaded via HTTPS). All data is embedded as JavaScript variables. The file must render correctly when opened directly in a browser via `open`.
 
-**If no:**
-Print: "Keeping current data. Run /patterns again after your next 5 tasks."
+**PAGE STRUCTURE:**
 
-Note: trends.md and reflections.md are NOT archived — they are permanent longitudinal records.
+The HTML page has the following sections in order. Use a dark theme throughout: background #0f172a, card background #1e293b, primary text #f1f5f9, secondary text #94a3b8, border color #334155. Font: Inter from Google Fonts (`https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap`). Load Chart.js from `https://cdn.jsdelivr.net/npm/chart.js`.
+
+**HEADER SECTION:**
+- Left side: "Codebase Health Report" in large bold text (28px), below it the date in secondary color
+- Right side: large health badge — pill shape, background = health color at 20% opacity, border = health color, text = health emoji + " " + health label in health color (e.g. "✅ HEALTHY"). Font size 16px, padding 8px 20px, border-radius 999px.
+- Full-width horizontal rule below
+
+**EXECUTIVE SUMMARY SECTION:**
+- Section heading: "At a Glance" (18px, medium weight, secondary color, uppercase, letter-spacing)
+- Three cards in a row (or stacked on narrow screens). Each card: white icon on left (use simple Unicode: 📊 📋 📈), plain English sentence on right. Card background #1e293b, border-radius 12px, padding 16px 20px.
+
+**HABITS TO FIX SECTION:**
+Show only if systemic patterns exist (occurrences >= 3 AND spans >= 2 tasks). Heading: "Habits to Fix" with count badge.
+One card per systemic pattern, sorted by avg_severity descending. Each card contains:
+- Top row: plain English category name (600 weight, 17px) on left, severity badge pill on right
+- Business impact sentence in secondary color (14px), italic
+- Stats row: "Appeared [N] times" · "Across [N] tasks: [task list]" · "Last seen: [task]"
+- Thin colored left border = severity badge color
+
+If no systemic patterns: show a green card "No repeating habits — every issue so far has been a one-off."
+
+**CHARTS SECTION — "By the Numbers":**
+
+Four charts in a 2×2 grid (2 columns on wide screens, 1 column on narrow). Each chart in its own card with a plain English title and subtitle.
+
+Chart 1 — "Issues by Type" (horizontal bar chart):
+- Title: "Issues by Type", subtitle: "How many times each problem category appeared"
+- Data: all categories from patterns.md, sorted by occurrences descending
+- X axis: count (integers), Y axis: plain English category names
+- Bar color: severity badge color for that category's avg_severity
+- Show value labels at end of each bar
+
+Chart 2 — "Audit Pass Rate" (doughnut chart):
+- Title: "Audit Results", subtitle: "Pass vs fail across all runs"
+- Data: PASS count, FAIL count, MAX_CYCLES count
+- Colors: #22c55e for PASS, #ef4444 for FAIL, #f97316 for MAX_CYCLES
+- Center text (plugin or CSS): large pass_rate% number, "pass rate" below it in secondary color
+- If no trend data: show placeholder "No audit history yet"
+
+Chart 3 — "Audit Severity Over Time" (line chart):
+- Title: "Audit Quality Over Time", subtitle: "Lower severity = fewer serious issues found (better)"
+- Data: audit_rows array — X axis dates, Y axis final_severity values
+- Line color: #3b82f6, fill below line at 10% opacity
+- Points colored by verdict: green for PASS, red for FAIL, orange for MAX_CYCLES
+- Y axis: 0–10, label each tick (1=Trivial, 5=Medium, 8=Critical)
+- Horizontal dashed reference line at y=5 labeled "Concern threshold"
+- If fewer than 2 rows: show placeholder "Need more runs to show trend"
+
+Chart 4 — "WorldClass Scores" (line chart):
+- Title: "WorldClass Scores Over Time", subtitle: "Target: 95/100 — are we getting there?"
+- Data: wc_rows — X axis dates, Y axis score values
+- Line color: #a855f7, fill below at 10% opacity
+- Points colored: green if score >= 95, yellow if 80-94, red if < 80
+- Y axis: 0–100
+- Horizontal dashed line at y=95 labeled "World-class threshold" in #22c55e
+- If fewer than 2 rows: show placeholder "Need more runs to show trend"
+
+**TASK BREAKDOWN TABLE:**
+- Heading: "Task History"
+- Table columns: Task | Date | Issues Found | Highest Severity | Verdict | WorldClass Score
+- Populate from audit_rows joined with wc_rows on task name (fuzzy match first 40 chars)
+- Row background: #1e293b, alternating slightly lighter #243044
+- Verdict cell: colored pill badge (green/red/orange)
+- Sort: most recent first
+- If no data: "No task history yet."
+
+**PHILOSOPHY CANDIDATES SECTION:**
+Show only if any systemic patterns qualify for graduation (occurrences >= 3, avg severity >= 6, spans >= 2 tasks).
+Heading: "Ready to Become Rules" with subtitle "These issues have appeared enough times that the dev team should add them as permanent coding standards."
+One card per qualifying pattern, plain English, with a "→ See terminal for approval" note.
+If none qualify: omit this section entirely.
+
+**TECHNICAL DETAIL SECTION (collapsible):**
+- A collapsed `<details><summary>` block: "Technical Detail (for developers)"
+- Inside: raw patterns.md contents in a `<pre>` block with monospace font, secondary color, smaller font size
+- Not expanded by default
+
+**FOOTER:**
+- "Generated by /patterns on [date]" in small secondary text, centered
+- "Open .autocode/reports/ to find previous reports"
 
 ---
 
-## STEP 9: REFLECTIONS SUMMARY
+## PHASE 3: OPEN REPORT
 
-Read `.autocode/reflections.md`. If it doesn't exist, print:
-"No reflections yet. Complete a task with /autocode to generate the first one."
-Then stop.
+Run: `open .autocode/reports/patterns-[today's date].html`
 
-If it exists:
-
-1. Count total logged reflections.
-
-2. If 3 or more reflections exist, scan all paragraphs for recurring themes:
-   - Plan assumptions that kept being wrong
-   - Categories of surprise (things the audit caught that the plan didn't anticipate)
-   - Patterns in what caused the most rework
-
-   For each theme appearing in 2+ reflections, print:
-   ```
-   🔍 RECURRING INSIGHT: [theme description]
-      Appeared in [N] reflections — systemic blind spot in the planning process
-   ```
-
-3. If fewer than 3 reflections: print "Need 3+ reflections to surface themes."
-
-4. Print the most recent reflection verbatim:
+Print in terminal:
 ```
-MOST RECENT REFLECTION:
-[date] | [task]
-──────────────────
-[paragraph]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  HEALTH REPORT GENERATED
+  Opened in your browser.
+  Saved: .autocode/reports/patterns-[date].html
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
 ---
 
-## STEP 10: PHILOSOPHY UPDATE
+## PHASE 4: INTERACTIVE STEPS (terminal)
 
-This step identifies findings severe enough to graduate into the philosophy — not just a prompt improvement, but a permanent new rule or anti-pattern that all future agents will be held to.
+**Step 4A — Archive prompt:**
 
-**Criteria for graduation:** A pattern qualifies if it meets EITHER of:
-- 3+ occurrences in patterns.md AND average severity ≥ 6
-- Appeared as a 🔍 RECURRING INSIGHT in Step 9 (meaning it showed up in post-task reflections, not just audit findings — a deeper signal)
+Ask in terminal: "Archive this batch and start fresh? (y/n)"
 
-For each qualifying pattern, spawn a single independent agent with this prompt:
+If yes:
+1. Rename `.autocode/patterns.md` → `.autocode/patterns-archive-[today's date].md`
+2. Create fresh `.autocode/patterns.md` with header: `# AutoCode Patterns Log`
+3. Print: "✅ Archived to patterns-archive-[date].md. Starting fresh."
+
+If no: print "Keeping current data."
+
+---
+
+**Step 4B — Philosophy graduation:**
+
+For each pattern that qualifies (occurrences >= 3 AND avg_severity >= 6 AND spans >= 2 tasks):
+
+Spawn a single independent agent:
 
 "You are a senior software architect deciding whether a recurring code quality problem deserves a permanent place in a project's coding philosophy.
 
-Here is the recurring pattern:
-[category, description, occurrence count, severity range]
+Recurring pattern: [category, plain English name, occurrence count, avg severity, task list]
 
-Here is the current philosophy document:
+Current philosophy document:
 [full contents of ~/.claude/autocode/philosophy.md]
 
-Your job: propose the exact text to add to the philosophy to prevent this pattern from recurring. Be specific about:
-1. Which section it belongs in (Anti-Patterns That Are Always Wrong, The 15 Rules, 15 Rules Compliance Checklist, The Shipping Gate, or a new section if none fit)
-2. The exact text to add — written in the same voice and format as the existing document
-3. Why this rises to the level of philosophy (not just a prompt tip) — what makes it a permanent standard rather than a one-time fix
+Propose the exact text to add to prevent this pattern from recurring. Be specific:
+1. Which section it belongs in
+2. The exact text to add — same voice and format as the existing document
+3. Why this rises to the level of philosophy (not just a one-time fix)
 
-Do not suggest vague guidance. 'Handle errors properly' is useless. 'Never return undefined from a function that the caller treats as always-present — use a Result type or throw explicitly' is useful.
+Do not suggest vague guidance. 'Handle errors properly' is useless. Cite the specific scenario, function type, or pattern.
 
 Output:
 SECTION: [which section]
 TEXT TO ADD:
-[the exact text]
-WHY THIS IS PHILOSOPHY-LEVEL: [one sentence]"
+[exact text]
+WHY PHILOSOPHY-LEVEL: [one sentence]"
 
-Capture the agent's proposal.
-
-Print the proposal clearly:
-
+Print proposal in terminal:
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  PHILOSOPHY UPDATE CANDIDATE
+  PHILOSOPHY CANDIDATE: [plain English name]
+  [N] occurrences · avg severity [N] · [N] tasks
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  Pattern: [category] — [N] occurrences, avg severity [N]
   Section: [proposed section]
 
-  Proposed addition:
   [TEXT TO ADD]
 
-  Why philosophy-level: [reason]
+  Why: [reason]
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
 Ask: "Add this to philosophy.md? (y/n)"
 
-**If yes:**
+If yes:
 1. Read `~/.claude/autocode/philosophy.md`
-2. Insert the proposed text into the correct section
-3. Append a new row to the `## CHANGELOG` table at the bottom of the file:
-   ```
-   | [today's date] | [section updated] | [one-line summary of what was added] | [pattern: N occurrences, avg severity N] |
-   ```
+2. Insert text into correct section
+3. Append to `## CHANGELOG` table: `| [date] | [section] | [one-line summary] | [N occurrences, avg severity N] |`
 4. Write the updated file
-5. Print: "✅ Philosophy updated. Added to [section]. Changelog entry written."
+5. Print: "✅ Added to [section]."
 
-**If no:**
-Print: "Skipped. Run /patterns again after more data if this keeps recurring."
+If no: print "Skipped."
 
-If multiple patterns qualify, present each proposal one at a time and ask y/n for each before moving to the next.
-
-If no patterns qualify: print "No patterns meet the graduation threshold yet (need 3+ occurrences at severity ≥ 6, or a recurring reflection insight)."
+Present each candidate one at a time. If none qualify: print "No patterns meet the graduation threshold (need 3+ occurrences at avg severity ≥ 6 across 2+ tasks)."
 
 ---
 
-## STEP 10.5: AGENT MEMORY FEEDBACK LOOP
+**Step 4C — Agent memory updates:**
 
-After the philosophy update step, map systemic patterns back into agent memory files so agents explicitly watch for their own historical blind spots on the next run.
+For each systemic pattern (occurrences >= 3, severity >= 5, spans >= 2 tasks), update the target agent memory:
 
-**Pattern-to-agent mapping:**
-| Pattern Category | Target Agent(s) |
-|-----------------|-----------------|
-| `error-handling` | architect.md |
-| `tests` | qa.md |
-| `auth` | security.md |
-| `security` | security.md |
-| `data-loss` | security.md, architect.md |
-| `feature-flag` | architect.md |
-| `async` | architect.md |
-| `edge-case` | qa.md |
-| `code-quality` | architect.md |
-| `performance` | architect.md |
-| `documentation` | docs.md |
-| `requirements` | qa.md |
+Category → agent mapping:
+- error-handling, feature-flag, async, edge-case, code-quality, performance, data-loss → architect.md
+- tests, requirements → qa.md
+- auth, security → security.md
+- documentation → docs.md
 
-**For each systemic pattern (3+ occurrences, severity ≥ 5) found in Step 3:**
+For each target agent file `.autocode/agents/[agent].md`:
+1. If file doesn't exist: skip (print warning)
+2. Find or create `## Known Blind Spots` section
+3. Add or update entry:
+   `- [plain English name]: [N] occurrences, avg severity [N] — [specific watch-for]`
+   `  Last seen: [last_seen_task] | Updated: [today's date]`
 
-1. Read the target agent's memory file at `.autocode/agents/[agent].md`
-2. If file doesn't exist: print "No memory file for [agent] — run /meet to initialize" and skip
-3. Find or create the `## Known Blind Spots` section
-4. Add or update the entry for this category:
-   ```
-   - [category]: [N] occurrences, avg severity [N] — [specific watch-for from patterns analysis]
-     Last seen: [most recent task where it appeared] | Updated: [today's date]
-   ```
-5. Write the updated memory file
+Update `.autocode/agents/cto.md` Known Blind Spots column for affected agents.
 
-**Also update CTO memory:**
-
-Read `.autocode/agents/cto.md`. Update the Known Blind Spots column for the affected agent row in the Team Health table. Write the updated file.
-
-**Print after all updates:**
+Print:
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   AGENT MEMORIES UPDATED
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  [list each memory file updated and what was written]
-  Effect: Agents will explicitly check these patterns next run.
-  Run /team-health to see updated blind spot catalog.
+  [list each file updated]
+  Agents will now explicitly watch for these patterns.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
-Log the update to `.autocode/patterns.md`:
-```
-## [today's date] | /patterns feedback — [N] blind spots written to agent memories
-[list: agent | category | occurrences]
-```
-
-If no patterns meet the threshold (3+ occurrences, severity ≥ 5): print "No agent memory updates — patterns below threshold." and skip this step.
+Log to `.autocode/patterns.md`:
+`## [today's date] | /patterns feedback — [N] blind spots written to agent memories`
 
 ---
 
 ## RULES
 
-- Never fabricate patterns — only report what is actually in the log
-- Be direct and specific in recommendations — the goal is actionable prompt improvements
-- If a pattern only appeared once, mention it briefly but do not recommend prompt changes for it yet
-- Always check archives before prompting to archive (Step 6 before Step 8)
-- Never archive trends.md or reflections.md — they are permanent
-- Philosophy updates are permanent — never propose an addition that is vague, redundant with existing rules, or could apply to any codebase generically
-- Read philosophy.md fresh before every proposed update — never work from a cached version
+- Never fabricate data — only use what is in the log files
+- Plain English translations are mandatory — never show raw category names in the HTML
+- The HTML file must be self-contained and open without a server
+- CDN links (Chart.js, Google Fonts) are the only external dependencies allowed
+- Charts show "Need more runs" placeholders if data is insufficient — never show empty axes
+- Philosophy updates require the agent's proposal — never write to philosophy.md without spawning the agent
+- Archive prompt always runs before philosophy step
+- Cross-task diversity required for systemic patterns — 3 occurrences on the same task is NOT a systemic pattern
+- Previous report files in .autocode/reports/ are never deleted — accumulate over time
