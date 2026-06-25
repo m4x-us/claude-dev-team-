@@ -557,8 +557,16 @@ If `MODE = "standalone"`:
     ─────────────────────────────────────────────────────────────
     ```
     Wait for user input.
-    If yes: run `/task #[TASK_NUM]`. Stop.
     If no: stop.
+    If yes:
+      Open `.autocode/tasks.md`. Find the `### Task #[TASK_NUM]` block.
+      Find the line immediately after the `**Owner:**` line in that block.
+      Remove any existing `**Audit findings —` block if present (replace it — don't accumulate stale findings).
+      Insert these lines at that position:
+        `**Audit findings — [today's date]** ([findings_count] issues pending fix):`
+        For each finding in FINDINGS_JSON:
+        `- [[finding.id]] [finding.category] [finding.description] — severity [finding.severity] | [finding.file]:[finding.function]:[finding.line]`
+      Run `/task #[TASK_NUM]`. Stop.
   If no task number detected in $ARGUMENTS: stop.
 
 **If verdict = PASS:**
