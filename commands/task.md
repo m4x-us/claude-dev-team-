@@ -268,7 +268,41 @@ This format is machine-parseable by Step 0.5 in the NEXT cycle. Descriptions wit
 
 Run: `/worldclass Task #[TASK_NUM]: [TASK_DEFINITION first line]`
 Wait for WORLDCLASS_RESULT.
-Whether PASS or MAX_CYCLES: proceed to Phase 4.
+
+If WORLDCLASS_RESULT.verdict = "PASS": proceed to Phase 4.
+
+If WORLDCLASS_RESULT.verdict = "MAX_CYCLES":
+  The task is not done. Pay the WorldClass tax now — deferring compounds debt.
+
+  **Step 3.1 — Write deductions to tasks.md:**
+  Open `.autocode/tasks.md`. Find the `### Task #[TASK_NUM]` block.
+  Find the line immediately after the `**Owner:**` line.
+  Remove any existing `**WorldClass deductions —` block if present.
+  Insert:
+    `**WorldClass deductions — [today's date]** ([95 - COMBINED_SCORE] pts from 95, [N] deductions pending fix):`
+    For each unresolved deduction from the final WorldClass scoring cycle (≥ -2 pts, both Architecture and Vibes):
+    `- [category] [description] — severity [N] (-[pts] pts)`
+
+  **Step 3.2 — Inject into CYCLE_HISTORY:**
+  Append to the in-session CYCLE_HISTORY variable:
+  "WORLDCLASS DEDUCTIONS — fix all of these before this task can close:
+  [same deduction list]"
+
+  **Step 3.3 — Write cycle log entry:**
+  Append to `.autocode/agents/cto.md` `## Task Cycle Log` under Task #[TASK_NUM]:
+    `#### Cycle [CURRENT_CYCLE] — [today's date] — WorldClass MAX_CYCLES`
+    `Build approach: WorldClass remediation — [top deduction category] was the blocking gap`
+    `Scripts: PASS (audit passed; WorldClass did not reach 95)`
+    `WorldClass score: [COMBINED_SCORE]/100 | Gap: [95 - COMBINED_SCORE] pts`
+    `Unresolved deductions: [top 3 by point value]`
+    `Fixed this cycle: — | Still open: WorldClass gap`
+    `New findings introduced: — | Regression signal: NO`
+    `CTO diagnosis run: NO — WorldClass quality gap, not a repeated audit finding`
+
+  **Step 3.4 — Increment and check escalation:**
+  Increment CURRENT_CYCLE.
+  If CURRENT_CYCLE > 5: trigger ESCALATION (reason: CYCLE_LIMIT_EXCEEDED — include WorldClass deductions in escalation brief).
+  Otherwise: return to Phase 1 Step 1.1. The build agent receives the WorldClass deductions via CYCLE_HISTORY and must fix them before the audit re-runs.
 
 ---
 
