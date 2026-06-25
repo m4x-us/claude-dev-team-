@@ -9,6 +9,24 @@ Execute every phase without pausing.
 
 ## PHASE 0: CTO CONTEXT
 
+**Step 0.0 — Complexity check:**
+Read `.autocode/tasks.md`. Find Task #TASK_NUM. Check for a `**Complexity: Direct**` line.
+
+If found:
+─────────────────────────────────────────────────────────────
+  ⚡ Task #[TASK_NUM] is tagged DIRECT complexity.
+  This was evaluated as a cosmetic or single-line fix when it
+  was added to the task list. The full dev team (audit, worldclass,
+  4 agents) will take 10× longer than handling it directly.
+
+  Recommended: open a regular Claude session and fix it there.
+
+  Continue with the full dev team anyway?  yes / no
+─────────────────────────────────────────────────────────────
+Wait for user input. If no: stop. If yes: proceed to Step 0.1.
+
+If no Complexity field or Complexity: Full: proceed to Step 0.1 silently.
+
 **Step 0.1 — Read task definition:**
 Read `.autocode/tasks.md`. Find Task #TASK_NUM.
 Extract: TASK_DEFINITION (full block), DONE_WHEN ("Done when:" line), TASK_FILES ("File:" line).
@@ -390,7 +408,14 @@ Count how many have `**Status: COMPLETE` in their block.
 If ALL tasks in the batch are COMPLETE:
   Run: `/team-health scan batch-[BATCH_NUM]-complete`
 
-  The survey updates `.autocode/map.md` with the current state of all three layers (pieces, modules, app). If the survey output includes PROPOSED ADDITIONS: review them and add any with severity ≥ 5 to the next BACKLOG batch in `.autocode/tasks.md`. Note each added task: "Added by layer survey — Batch [N] complete — [today's date]".
+  The survey updates `.autocode/map.md` with the current state of all three layers (pieces, modules, app). If the survey output includes PROPOSED ADDITIONS: review them and add any with severity ≥ 5 to the next BACKLOG batch in `.autocode/tasks.md`.
+
+  Before writing each proposed task, run COMPLEXITY_EVAL on its description:
+  DIRECT if ALL: (a) ≤ 20 words, (b) contains a cosmetic keyword (typo/comment/rename/update text/fix label/add log/remove unused/clarify/whitespace/formatting), (c) contains none of: auth/security/database/migration/schema/api route/endpoint/feature flag/implement/integrate/webhook/redis/queue/worker/payment/order/multi-file.
+  FULL otherwise (default when in doubt).
+  Write `**Complexity: Direct**` or `**Complexity: Full**` on each task entry before the Owner line.
+
+  Note each added task: "Added by layer survey — Batch [N] complete — [today's date]".
 
   Print:
   ```

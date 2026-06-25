@@ -451,6 +451,7 @@ Theme: [what all these tasks have in common — e.g., 'Security foundation fixes
 **Risk:** [Low / Medium (with mitigation) / High (with mitigation)]
 **Completion gates:** [Security Agent sign-off / Architecture Agent sign-off / etc.]
 **Done when:** [mechanically checkable condition — grep output, test count, script output]
+**Complexity:** [Direct / Full — see HARD RULE 13]
 **Owner:** [Security Agent / Architecture Agent / QA Agent / Docs Agent]
 
 [repeat for each task in batch]
@@ -484,7 +485,18 @@ HARD RULES for task generation:
     Owner's B2 answer (customer blockers) must generate at least one BUILD task per blocker named.
 12. BUILD tasks for features must describe the user experience, not just the code change.
     What: describe what the user can do after this is built, then the technical implementation.
-    Done when: must be verifiable from the user's perspective AND from the code (e.g., 'User can submit form without page reload — verified by Playwright test + API returns 200')"
+    Done when: must be verifiable from the user's perspective AND from the code (e.g., 'User can submit form without page reload — verified by Playwright test + API returns 200')
+13. COMPLEXITY EVALUATION — every task gets one of two labels on its Complexity: field:
+    DIRECT: handle with regular Claude, skip the full dev team. Criteria — ALL THREE must be true:
+      (a) What: description is ≤ 20 words
+      (b) Contains at least one of: typo, comment, rename, update text, fix text, change text,
+          update message, fix message, update wording, update label, fix label, update copy,
+          add log, remove unused, remove debug, clarify, whitespace, formatting, fix string,
+          missing semicolon, fix comment, update copy
+      (c) Contains NONE of: auth, security, permission, role, tenant, database, migration,
+          schema, api route, endpoint, feature flag, implement, integrate, webhook, redis,
+          queue, worker, payment, order, multi-file
+    FULL: everything else. Default when in doubt — always safer to use the full team."
 
 Write the output to `.autocode/tasks.md`.
 
