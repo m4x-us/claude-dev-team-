@@ -31,6 +31,8 @@ Read in this order (all mandatory):
 11. Run: `git log --oneline -50` → `GIT_LOG`
 12. Run: `git diff HEAD~10..HEAD --name-only` → `RECENT_FILES`
 13. Run: `pnpm audit --json 2>/dev/null | head -30` → `CVE_SNAPSHOT` (or skip if not a Node.js project)
+14. Read `ROADMAP.md`, `docs/ROADMAP.md`, or `docs/PLANNED.md` (first found, first 150 lines) → `PRODUCT_ROADMAP` (or "None found")
+15. Run: `grep -rn "TODO\|FIXME\|PLANNED\|COMING SOON\|NOT YET\|NYI" --include="*.ts" --include="*.tsx" --include="*.md" . | grep -v node_modules | grep -v ".next" | head -60` → `CODE_TODOS`
 
 From GIT_LOG, identify:
 - **CHURN_ZONES:** files or directories appearing in 5+ of the last 50 commit messages
@@ -256,7 +258,64 @@ Capture as `FINDINGS_DOCS`.
 
 ---
 
-Wait for all four agents to complete before proceeding.
+**Examination Agent 5 — Product Completeness**
+
+Spawn an independent agent simultaneously with this prompt:
+
+"You are a Product Agent onboarding to this project. You are NOT looking for code quality problems — the other agents handle that. You are looking at this product through the eyes of a customer and a business owner: what is it supposed to do, what does it actually do, and what is obviously missing?
+
+PROJECT CONTEXT:
+[PROJECT_CONTEXT]
+
+PROJECT STATUS:
+[PROJECT_STATUS]
+
+EXISTING PRODUCT ROADMAP (if any):
+[PRODUCT_ROADMAP]
+
+CODE TODO MARKERS:
+[CODE_TODOS]
+
+GIT LOG (last 50 commits — tells you what was recently built):
+[GIT_LOG]
+
+RECENT FILES (last 10 commits):
+[RECENT_FILES]
+
+DEAD ZONES (modules mentioned in docs with no recent commits):
+[DEAD_ZONES]
+
+Your job — four lenses:
+
+LENS 1 — WHAT EXISTS vs WHAT WAS PROMISED
+Compare PROJECT_STATUS and PRODUCT_ROADMAP against GIT_LOG and RECENT_FILES.
+What was described as coming or planned that has no matching commit?
+What is marked 'in progress' in docs but has no recent activity?
+List each gap as: PLANNED: [feature] | STATUS: [no commits / stalled / partially built] | EVIDENCE: [doc line or TODO marker]
+
+LENS 2 — DEAD ZONES (forgotten features)
+For each DEAD_ZONE module: is it complete and stable, or incomplete and abandoned?
+A stable module has no TODOs and was finished in a prior phase. An abandoned module has TODOs, stubs, or a STATUS entry that says 'in progress' but no recent commits.
+List each as: MODULE: [name] | VERDICT: [stable / abandoned] | EVIDENCE: [specific indicator]
+
+LENS 3 — VISIBLE INCOMPLETENESS
+From CODE_TODOS: which are product gaps (missing features) vs code debt (quality issues)?
+Product gaps = functionality users would notice is missing.
+Code debt = internal quality issues (handled by other agents).
+List only product gaps as: TODO: [description] | FILE: [file:line] | IMPACT: [what a user cannot do because of this]
+
+LENS 4 — CUSTOMER EXPERIENCE GAPS
+Based purely on what the product claims to do (PROJECT_CONTEXT), what would a first-time user hit that would feel broken or incomplete?
+Do NOT speculate — only list gaps you can ground in specific evidence from the context or code markers.
+
+Output format:
+PRODUCT_FINDINGS: [numbered list — each item covers one of the four lenses, cites specific evidence]"
+
+Capture as `FINDINGS_PRODUCT`.
+
+---
+
+Wait for all five agents to complete before proceeding.
 
 ---
 
@@ -298,13 +357,23 @@ Questions that would be generic and are FORBIDDEN:
   - 'What should we prioritize?'
   - 'What's most important to you?'
 
-Questions should surface:
-- Priority conflicts (multiple critical findings — which comes first?)
-- Intentional vs. accidental (is this finding a known accepted tradeoff or a bug?)
-- Strategic direction (does Max's answer change the batch ordering?)
-- Missing context (something visible in the code that needs business explanation)
+Questions come in two types — produce both:
 
-Produce exactly 4–5 questions. Number them. Each question must cite its source finding."
+BUSINESS QUESTIONS (always ask these 2 — regardless of findings):
+B1: 'What is the single most important thing this product needs to do for customers in the next 90 days — the thing that would make the biggest difference to the business?'
+B2: 'What are customers or users blocked from doing right now that they need to be able to do? What's the most common complaint or request?'
+
+FINDING QUESTIONS (earned by specific findings — produce 3):
+Every finding question must cite a specific finding. Required format:
+  Q1: 'I found [specific finding]. Does that mean [specific decision needed]?'
+
+Finding questions should surface:
+- Priority conflicts (multiple critical findings — which comes first?)
+- Intentional vs. accidental (is this a known tradeoff or a real gap?)
+- Strategic direction (does Max's answer change the batch ordering?)
+- Product gaps (does the product agent finding match Max's understanding of what's built?)
+
+Produce exactly 5 questions total: B1, B2, Q1, Q2, Q3. Number them 1–5."
 
 Capture the synthesis agent's output as `SYNTHESIS_QUESTIONS`.
 
@@ -338,7 +407,13 @@ QA findings:
 Documentation findings:
 [FINDINGS_DOCS]
 
-Project owner's answers:
+Product completeness findings (what's missing from the product, not just from the code):
+[FINDINGS_PRODUCT]
+
+Existing product roadmap:
+[PRODUCT_ROADMAP]
+
+Project owner's answers (especially B1 and B2 — these define what matters most):
 [OWNER_ANSWERS]
 
 Existing tasks to carry forward (open items only):
@@ -400,7 +475,16 @@ HARD RULES for task generation:
 7. Owner's answers OVERRIDE default ordering — if Max said X is priority, X goes in Batch 1
 8. Mark current work batch as [CURRENT SPRINT]; all others as [BACKLOG]
 9. High-risk tasks (auth, data model, payments) require Tier 3-4 DoD notation
-10. Never create a task without a mechanically checkable done condition"
+10. Never create a task without a mechanically checkable done condition
+11. TWO TASK TYPES — both must appear in the list:
+    - FIX tasks: address findings from Architecture, Security, QA, Docs agents (code quality, correctness)
+    - BUILD tasks: address findings from the Product agent and owner's B1/B2 answers (features customers need)
+    Use [fix] or [build] as the category tag on each task header.
+    Owner's B1 answer (90-day priority) must generate at least one BUILD task in Batch 1 or 2.
+    Owner's B2 answer (customer blockers) must generate at least one BUILD task per blocker named.
+12. BUILD tasks for features must describe the user experience, not just the code change.
+    What: describe what the user can do after this is built, then the technical implementation.
+    Done when: must be verifiable from the user's perspective AND from the code (e.g., 'User can submit form without page reload — verified by Playwright test + API returns 200')"
 
 Write the output to `.autocode/tasks.md`.
 
