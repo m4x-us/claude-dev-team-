@@ -36,7 +36,30 @@ Read `.autocode/tasks.md`. If not found:
 No task list found. Run /meet to generate one.
 ```
 
-Print the full contents of `.autocode/tasks.md`.
+Parse each `## Batch N` section and every `### Task #` entry within it. For each task extract: number, title (first line of description), Complexity field, Owner, Status.
+
+Print a formatted summary:
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TASK LIST
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Batch N — [theme]
+  #NNN  [⚡ Direct / 🔧 Full / ❓ No label]  [title]
+        [owner] · [COMPLETE ✓ / open]
+  ...
+
+Batch N+1 — [theme]
+  ...
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  [total open] open  ·  [total complete] complete  ·  [total] total
+  [N] tasks missing Complexity label — run /task #N to classify
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+Icons: `⚡ Direct` = no full dev team needed. `🔧 Full` = full team. `❓ No label` = unclassified, will be evaluated at Step 0.0 when run.
 
 ---
 
@@ -128,13 +151,13 @@ Print: "✅ Task list updated."
 
 ## MODE: batch (batch N)
 
-Read `.autocode/tasks.md`. Extract and print all tasks in Batch N.
+Read `.autocode/tasks.md`. Extract all tasks in Batch N. Print using the same formatted summary as MODE: list, scoped to that batch only.
 
 ---
 
 ## MODE: open
 
-Read `.autocode/tasks.md`. Find the [CURRENT SPRINT] batch. Print only tasks WITHOUT a `Status: COMPLETE` line.
+Read `.autocode/tasks.md`. Find all tasks WITHOUT a `Status: COMPLETE` line across all batches. Print using the same formatted summary as MODE: list, open tasks only.
 
 ---
 
