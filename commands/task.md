@@ -300,24 +300,26 @@ Note: No resolved sweep. A finding absent from this audit may simply not have be
 
 Print: "Agent memories updated — security ([N] open), architect ([N] open), qa ([N] open)."
 
-**Step 4.1 — Run /reflect:**
-
-Run: `/reflect Task #[TASK_NUM]: [TASK_DEFINITION first line]`
-
-Edit `.autocode/tasks.md`: add `**Status: COMPLETE — [today's date]**` below Task #TASK_NUM Owner line.
-
-Update cto.md Task Cycle Log for this task: change `Status: In Progress | Cycle N` → `Status: COMPLETE | Cycle N | Completed: [today's date]`
+**Step 4.1 — Ask Max before closing:**
 
 Print:
-```
 ─────────────────────────────────────────────────────────────
-  Task #[TASK_NUM] complete. WorldClass: [score]/100 | Cycles: [N]
-  Review the diff and verify the result.
+  Task #[TASK_NUM] passed audit. WorldClass: [score]/100 | Cycles: [N]
+  Mark it complete and start the next task?
 
-  Satisfied?       /tasks done #[TASK_NUM]
-  Want re-audit?   /audit #[TASK_NUM]
+    yes → mark #[TASK_NUM] complete, start next task
+    no  → leave #[TASK_NUM] open, stop here
 ─────────────────────────────────────────────────────────────
-```
+
+Wait for user input.
+
+If **no**: stop. Task remains In Progress.
+
+If **yes**:
+  Run: `/reflect Task #[TASK_NUM]: [TASK_DEFINITION first line]`
+  Edit `.autocode/tasks.md`: add `**Status: COMPLETE — [today's date]**` below Task #TASK_NUM Owner line.
+  Update cto.md Task Cycle Log: change `Status: In Progress | Cycle N` → `Status: COMPLETE | Cycle N | Completed: [today's date]`
+  Proceed to Step 4.2.
 
 **Step 4.2 — Patterns graduation check:**
 If `scripts/check-patterns-threshold.sh` exists:
@@ -399,6 +401,17 @@ Read all non-COMPLETE tasks from `.autocode/tasks.md` (across all batches). Read
 ```
 
 If nothing moved: print nothing. The reorder is silent when the list is already in the right order.
+
+**Step 4.5 — Start next task:**
+
+Scan `.autocode/tasks.md` top to bottom. Find the first `### Task #` block that does NOT contain `**Status: COMPLETE`. That is NEXT_TASK_NUM.
+
+If NEXT_TASK_NUM found: run `/task #[NEXT_TASK_NUM]`.
+
+If no open tasks remain:
+─────────────────────────────────────────────────────────────
+  All tasks complete. Run /team-health to see the full picture.
+─────────────────────────────────────────────────────────────
 
 ---
 
